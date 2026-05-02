@@ -1,0 +1,52 @@
+# ============================================================
+# MikroTik RouterOS Toolkit — Archivos a ignorar en Git
+# ============================================================
+
+# ──────────────────────────────────────────
+# 🔐 CREDENCIALES — NUNCA subir al repo
+# ──────────────────────────────────────────
+mikrotik/config.env
+config.env
+*.env
+!*.env.example        # sí trackear los archivos de ejemplo
+
+# ──────────────────────────────────────────
+# 🐍 Python cache
+# ──────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+
+# ──────────────────────────────────────────
+# 🖥️ Editores e IDEs
+# ──────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# ──────────────────────────────────────────
+# 💻 Sistema operativo
+# ──────────────────────────────────────────
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ──────────────────────────────────────────
+# 📋 Logs locales
+# ──────────────────────────────────────────
+*.log
+logs/
