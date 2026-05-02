@@ -65,7 +65,6 @@ def block_mac(api, mac: str):
         f"=src-mac-address={mac}",
         "=action=drop",
         f"=comment={COMMENT_TAG}-{mac}",
-        "=place-before=0",
     ])
     print(f"\n  {C.ERR}🔴 MAC bloqueada:{C.RESET} {C.BOLD}{mac}{C.RESET}")
     print(f"  {C.DIM}(el bloqueo persiste aunque el dispositivo cambie de IP){C.RESET}\n")
