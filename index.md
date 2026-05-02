@@ -1,6 +1,6 @@
 # MikroTik Network Tools
 
-Colección de scripts Python para monitoreo y diagnóstico de un router **MikroTik RouterOS v6.49.19** via la API nativa (puerto 8728).
+Colección de scripts Python para monitoreo y diagnóstico de routers **MikroTik RouterOS** via la API nativa (puerto 8728).
 
 ---
 
@@ -27,7 +27,7 @@ mikrotik/
 Edita `config.env` con los datos de tu router:
 
 ```env
-MIKROTIK_HOST=192.168.5.1
+MIKROTIK_HOST=192.168.1.1
 MIKROTIK_PORT=8728
 MIKROTIK_USER=admin
 MIKROTIK_PASSWORD=tu_contraseña
@@ -47,11 +47,7 @@ python3 scripts/02_top_consumers.py
 
 ```bash
 # Desde la raíz del proyecto:
-cd /home/daniel/dev/support/
-./mikrotik.sh
-
-# O directamente desde la carpeta:
-cd mikrotik/
+cd routeros-toolkit/
 ./menu.py
 ```
 
@@ -62,23 +58,21 @@ El **menú principal** tiene 4 categorías y 13 opciones. Selecciona con número
 ## 📁 Estructura
 
 ```
-/home/daniel/dev/support/
-├── mikrotik.sh                 ← 🚀 LANZADOR (ejecutar desde aquí)
-└── mikrotik/
-    ├── menu.py                 ← Menú interactivo principal
-    ├── config.env              ← Credenciales del router (editar aquí)
-    ├── index.md                ← Esta documentación
-    ├── lib/
-    │   ├── __init__.py
-    │   └── mikrotik_api.py     ← Librería base (API, colores, utilidades)
-    └── scripts/
-        ├── 01_list_devices.py      ← Inventario de dispositivos
-        ├── 02_top_consumers.py     ← Top consumidores
-        ├── 03_live_monitor.py      ← Monitor en vivo
-        ├── 04_interface_stats.py   ← Tráfico por interfaz
-        ├── 05_router_log.py        ← Log del router
-        ├── 06_block_ip.py          ← Bloquear/desbloquear IPs
-        └── 07_system_info.py       ← Info del sistema (CPU/RAM/uptime)
+/home/user/routeros-toolkit/
+├── menu.py                 ← Menú interactivo principal
+├── config.env              ← Credenciales del router (editar aquí)
+├── index.md                ← Esta documentación
+├── lib/
+│   ├── __init__.py
+│   └── mikrotik_api.py     ← Librería base (API, colores, utilidades)
+└── scripts/
+    ├── 01_list_devices.py      ← Inventario de dispositivos
+    ├── 02_top_consumers.py     ← Top consumidores
+    ├── 03_live_monitor.py      ← Monitor en vivo
+    ├── 04_interface_stats.py   ← Tráfico por interfaz
+    ├── 05_router_log.py        ← Log del router
+    ├── 06_block_ip.py          ← Bloquear/desbloquear IPs
+    └── 07_system_info.py       ← Info del sistema (CPU/RAM/uptime)
 ```
 
 ### `01_list_devices.py` — Inventario de dispositivos
@@ -99,8 +93,8 @@ python3 scripts/01_list_devices.py | grep ether5
 ```
   IP               MAC                HOSTNAME                   ESTADO     PUERTO   TIPO     FABRICANTE
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────
-  192.168.5.22     F0:2F:74:CB:97:3F  —                          estática   ether5   STATIC   ASUSTeK
-  192.168.5.93     00:1E:C2:C6:4C:F1  Daniels-iMac               bound      ether3   DHCP     Apple
+  192.168.1.10     AA:BB:CC:11:22:33  PC-Escritorio              estática   ether2   STATIC   ASUSTeK
+  192.168.1.25     AA:BB:CC:44:55:66  mi-laptop                  bound      ether3   DHCP     Apple
 ```
 
 ---
@@ -191,7 +185,7 @@ Cada word se prefija con su longitud codificada en 1–4 bytes:
 ```
 /ip/dhcp-server/lease/print    ← comando (empieza con /)
 =name=valor                    ← parámetro (=clave=valor)
-?src-address=192.168.5.1       ← filtro/query
+?src-address=192.168.1.1       ← filtro/query
 !re                            ← respuesta: registro
 !done                          ← respuesta: fin de resultados
 !trap                          ← respuesta: error
@@ -252,18 +246,18 @@ Campos relevantes por conexión:
 
 ---
 
-## 🗺️ Mapa de red detectado
+## 🗺️ Ejemplo de mapa de red
+
+> La sección de mapa de red es generada dinámicamente por `01_list_devices.py`.  
+> Aquí se muestra un ejemplo ilustrativo con datos ficticios.
 
 | IP | Hostname | MAC | Puerto | Tipo |
 |----|----------|-----|--------|------|
-| 192.168.5.22 | *(PC ASUS — IP estática)* | F0:2F:74:CB:97:3F | ether5 | STATIC |
-| 192.168.5.21 | *(PC GIGABYTE — IP estática)* | D8:5E:D3:83:0A:D2 | ether3 | STATIC |
-| 192.168.5.93 | Daniels-iMac | 00:1E:C2:C6:4C:F1 | ether3 | DHCP |
-| 192.168.5.48/39 | deco-X55 (x2) | DC:62:79:FA:4A:… | ether3/4 | DHCP |
-| 192.168.5.56/57 | H1c EZVIZ (x2) | 60:DC:81:… | ether3 | DHCP |
-| 192.168.5.43 | Google-Home-Mini | 44:07:0B:52:26:B9 | ether3 | DHCP |
-| 192.168.5.55 | Blink-Mini | 74:AB:93:A8:2F:63 | ether4 | DHCP |
-| 192.168.5.87 | EPSON F5430E | B0:E8:92:F5:43:0E | ether4 | DHCP |
+| 192.168.1.10 | *(PC — IP estática)* | AA:BB:CC:11:22:33 | ether2 | STATIC |
+| 192.168.1.11 | *(NAS — IP estática)* | AA:BB:CC:44:55:66 | ether3 | STATIC |
+| 192.168.1.25 | mi-laptop | AA:BB:CC:77:88:99 | ether3 | DHCP |
+| 192.168.1.30 | Google-Home | AA:BB:CC:AA:BB:CC | ether4 | DHCP |
+| 192.168.1.45 | Impresora-HP | AA:BB:CC:DD:EE:FF | ether4 | DHCP |
 
 ---
 
