@@ -359,22 +359,59 @@ def fmt_bytes(b: int) -> str:
     return f"{b} B"
 
 
+def is_random_mac(mac: str) -> bool:
+    """
+    Detecta si una MAC es localmente administrada (aleatoria/privada).
+
+    Las MACs aleatorias tienen el bit 1 (segunda posición) del primer octeto en 1.
+    Ejemplo: 92:xx → 0x92 = 10010010 → bit 1 encendido → aleatoria.
+    iOS 14+, Android 10+, Windows 10+ generan estas MACs por privacidad.
+    """
+    if not mac or len(mac) < 2:
+        return False
+    try:
+        first_byte = int(mac.replace(":", "").replace("-", "")[:2], 16)
+        return bool(first_byte & 0x02)
+    except ValueError:
+        return False
+
+
 def get_mac_vendor_cache() -> dict:
     """
     Retorna un dict con prefijos OUI conocidos (sin necesitar internet).
     Clave: primeros 8 caracteres de la MAC en mayúsculas (AA:BB:CC).
-    Se puede extender manualmente con más entradas.
     """
     return {
+        # Apple
+        "00:1E:C2": "Apple",
+        "AC:BC:32": "Apple",
+        "F0:18:98": "Apple",
+        "8C:85:90": "Apple",
+        "60:F8:1D": "Apple",
+        "A8:86:DD": "Apple",
+        "98:10:E8": "Apple",
+        "C4:B3:01": "Apple",
+        "38:CA:DA": "Apple",
+        "00:23:12": "Apple",
+        "00:26:BB": "Apple",
+        "3C:07:54": "Apple",
+        "78:D7:5F": "Apple",
+        "F4:F1:5A": "Apple",
+        "DC:A4:CA": "Apple",
+        "B8:E8:56": "Apple",
         # Computadoras / placas madre
         "F0:2F:74": "ASUSTeK",
+        "BC:AE:C5": "ASUSTeK",
         "D8:5E:D3": "GIGABYTE",
-        "00:1E:C2": "Apple",
-        "00:90:A9": "Intel/Xircom",
+        "1C:69:7A": "GIGABYTE",
+        "00:90:A9": "Intel",
         "FC:3C:D7": "Foxconn",
         "84:28:59": "Liteon/Realtek",
         "10:BF:67": "Intel",
         "9C:53:22": "Intel",
+        "8C:8D:28": "Intel",
+        "00:1B:21": "Intel",
+        "A4:C3:F0": "Intel",
         # Amazon (Echo, Fire, plugs, Ring, Blink)
         "8C:2A:85": "Amazon",
         "08:7C:39": "Amazon",
@@ -382,34 +419,86 @@ def get_mac_vendor_cache() -> dict:
         "08:57:FB": "Amazon",
         "74:AB:93": "Blink (Amazon)",
         "00:F3:61": "Amazon",
-        # TP-Link
+        "40:B4:CD": "Amazon",
+        "FC:A1:83": "Amazon",
+        # TP-Link / Deco
         "DC:62:79": "TP-Link",
         "54:D6:0D": "TP-Link",
         "A8:80:55": "TP-Link",
+        "50:D4:F7": "TP-Link",
+        "3C:52:A1": "TP-Link",
         # Hikvision / EZVIZ
         "60:DC:81": "EZVIZ/Hikvision",
-        # Google / Nest
+        "C0:56:E3": "Hikvision",
+        # Google / Nest / Chromecast
         "44:07:0B": "Google",
+        "F4:F5:D8": "Google",
+        "6C:AD:F8": "Google",
+        # Samsung
+        "64:1C:AE": "Samsung",
+        "A6:E5:35": "Samsung",
+        "78:AB:BB": "Samsung",
+        "8C:C8:4B": "Samsung",
+        "50:32:75": "Samsung",
+        # Xiaomi / Redmi / POCO
+        "F6:4F:F8": "Xiaomi",
+        "22:AE:16": "Xiaomi",
+        "3A:F9:EE": "Xiaomi",
+        "78:11:DC": "Xiaomi",
+        "A4:50:46": "Xiaomi",
+        "34:CE:00": "Xiaomi",
         # Impresoras
         "B0:E8:92": "Epson",
-        # Xiaomi / Redmi / POCO
-        "F6:4F:F8": "Xiaomi (random)",
-        "22:AE:16": "Xiaomi (random)",
-        "3A:F9:EE": "Xiaomi (random)",
-        # Samsung
-        "A6:E5:35": "Samsung (random)",
-        "64:1C:AE": "Samsung",
+        "00:26:AB": "Epson",
+        "44:D2:44": "HP",
+        "3C:D9:2B": "HP",
+        "B4:B6:86": "Brother",
+        "00:1B:A9": "Brother",
+        # Routers / APs genéricos
+        "18:D6:C7": "TP-Link",
+        "18:A6:F7": "Belkin",
+        "C0:C9:E3": "Netgear",
+        "C4:E9:84": "Netgear",
+        "00:22:B0": "Linksys",
+        # IoT / Smart home
+        "DC:29:19": "Espressif (IoT)",
+        "E8:DB:84": "Espressif (IoT)",
+        "30:AE:A4": "Espressif (IoT)",
+        "AC:67:B2": "Espressif (IoT)",
+        "CC:50:E3": "Espressif (IoT)",
         # Otros
         "38:1F:8D": "Realtek",
         "18:DE:50": "Broadcom",
-        "DC:29:19": "Espressif (IoT)",
-        "92:03:D7": "Desconocido",
-        "7C:C2:C6": "Desconocido",
-        "7C:63:05": "Desconocido",
-        "C0:91:B9": "Desconocido",
-        "52:2C:81": "Desconocido (random)",
-        "3A:3C:EB": "Desconocido (random)",
+        "FC:3C:D7": "Foxconn",
     }
+
+
+def lookup_mac_vendor_online(mac: str, cache: dict, timeout: int = 3) -> str:
+    """
+    Consulta la API gratuita de macvendors.com para obtener el fabricante.
+    Guarda el resultado en `cache` para no repetir la consulta.
+    Retorna el nombre del fabricante o cadena vacía si no se encuentra.
+
+    Límite de uso: ~1 req/seg (free tier). Usar solo para OUIs desconocidos.
+    """
+    import urllib.request
+    import time
+
+    oui = mac[:8].upper()
+    if oui in cache:
+        return cache[oui]
+
+    try:
+        url = f"https://api.macvendors.com/{oui}"
+        req = urllib.request.Request(url, headers={"User-Agent": "routeros-toolkit/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            vendor = resp.read().decode("utf-8").strip()
+            cache[oui] = vendor
+            time.sleep(1.1)   # respetar el rate limit
+            return vendor
+    except Exception:
+        cache[oui] = ""
+        return ""
 
 
 def resolve_device_name(ip: str, mac: str, hostname: str,
@@ -432,7 +521,13 @@ def resolve_device_name(ip: str, mac: str, hostname: str,
         String con el nombre más descriptivo disponible.
     """
     vendor_cache = get_mac_vendor_cache()
-    vendor = vendor_cache.get(mac[:8].upper(), "") if mac else ""
+    oui    = mac[:8].upper() if mac else ""
+    vendor = vendor_cache.get(oui, "")
+    random = is_random_mac(mac) if mac else False
+
+    # Si la MAC es aleatoria y no hay hostname, marcarla claramente
+    if random and not vendor:
+        vendor = "📱 MAC privada"
 
     # Nombres genéricos de interfaces de red — no son útiles
     generic_names = {"wlan0", "wlan1", "eth0", "eth1", "lwip", "android"}
