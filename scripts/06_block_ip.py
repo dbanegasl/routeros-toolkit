@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 """
-06_block_ip.py — Bloquear / Desbloquear una IP en el firewall
-=============================================================
+06_block_ip.py — Bloquear / Desbloquear dispositivos por MAC en el firewall
+============================================================================
 
-Agrega o elimina una regla de bloqueo en /ip/firewall/filter.
-La regla se agrega al inicio de la cadena FORWARD con action=drop
-y un comentario identificador para poder quitarla fácilmente.
+Bloquea por dirección MAC (src-mac-address) en lugar de IP, lo que hace el
+bloqueo robusto: si el dispositivo cambia de IP sigue bloqueado.
 
 Regla que crea:
-    chain=forward  src-address=<IP>  action=drop
-    comment="BLOQUEADO-POR-MENU-<IP>"
+    chain=forward  src-mac-address=<MAC>  action=drop
+    comment="BLOQUEADO-POR-MENU-<MAC>"
 
 Uso:
-    python3 scripts/06_block_ip.py --block 192.168.5.22
-    python3 scripts/06_block_ip.py --unblock 192.168.5.22
-    python3 scripts/06_block_ip.py --list          # ver IPs bloqueadas
+    python3 scripts/06_block_ip.py --block AA:BB:CC:DD:EE:FF
+    python3 scripts/06_block_ip.py --unblock AA:BB:CC:DD:EE:FF
+    python3 scripts/06_block_ip.py --list          # ver MACs bloqueadas
     python3 scripts/06_block_ip.py                 # modo interactivo
+
+Nota: bloquear por IP es evadible cambiando la IP del dispositivo.
+      El bloqueo por MAC persiste aunque el dispositivo tome otra IP.
 """
 
 import sys
@@ -38,92 +40,138 @@ def get_blocked(api) -> list:
 def list_blocked(api):
     blocked = get_blocked(api)
     if not blocked:
-        print(f"\n  {C.GREEN}No hay IPs bloqueadas por este script.{C.RESET}\n")
+        print(f"\n  {C.GREEN}No hay dispositivos bloqueados por este script.{C.RESET}\n")
         return
-    print(f"\n{C.BOLD}  IPs bloqueadas:{C.RESET}")
-    print(f"  {'ID':<8} {'IP BLOQUEADA':<20} COMENTARIO")
-    print(f"  {'─'*55}")
+    print(f"\n{C.BOLD}  Dispositivos bloqueados:{C.RESET}")
+    print(f"  {'ID':<8} {'MAC BLOQUEADA':<22} COMENTARIO")
+    print(f"  {'─'*60}")
     for r in blocked:
-        print(f"  {r.get('.id','?'):<8} {r.get('src-address','?'):<20} {r.get('comment','')}")
+        mac = r.get("src-mac-address", r.get("src-address", "?"))
+        print(f"  {r.get('.id','?'):<8} {mac:<22} {r.get('comment','')}")
     print()
 
 
-def block_ip(api, ip: str):
-    # Verificar si ya está bloqueada
+def block_mac(api, mac: str):
+    mac = mac.upper()
     blocked = get_blocked(api)
     for r in blocked:
-        if r.get("src-address") == ip:
-            print(f"\n  {C.WARN}⚠️  {ip} ya está bloqueada "
+        if r.get("src-mac-address", "").upper() == mac:
+            print(f"\n  {C.WARN}⚠️  {mac} ya está bloqueada "
                   f"(ID: {r.get('.id')}){C.RESET}\n")
             return
 
     api.command("/ip/firewall/filter/add", params=[
         "=chain=forward",
-        f"=src-address={ip}",
+        f"=src-mac-address={mac}",
         "=action=drop",
-        f"=comment={COMMENT_TAG}-{ip}",
-        "=place-before=0",       # insertar al inicio
+        f"=comment={COMMENT_TAG}-{mac}",
+        "=place-before=0",
     ])
-    print(f"\n  {C.ERR}🔴 IP bloqueada:{C.RESET} {C.BOLD}{ip}{C.RESET}\n")
+    print(f"\n  {C.ERR}🔴 MAC bloqueada:{C.RESET} {C.BOLD}{mac}{C.RESET}")
+    print(f"  {C.DIM}(el bloqueo persiste aunque el dispositivo cambie de IP){C.RESET}\n")
 
 
-def unblock_ip(api, ip: str):
+def unblock_mac(api, mac: str):
+    mac = mac.upper()
     blocked = get_blocked(api)
-    found = [r for r in blocked if r.get("src-address") == ip]
+    found = [r for r in blocked if r.get("src-mac-address", "").upper() == mac]
     if not found:
-        print(f"\n  {C.WARN}No hay regla de bloqueo para {ip}{C.RESET}\n")
+        print(f"\n  {C.WARN}No hay regla de bloqueo para {mac}{C.RESET}\n")
         return
     for r in found:
         api.command("/ip/firewall/filter/remove",
                     params=[f"=.id={r['.id']}"])
-    print(f"\n  {C.GREEN}✅ Desbloqueo exitoso:{C.RESET} {C.BOLD}{ip}{C.RESET}\n")
+    print(f"\n  {C.GREEN}✅ Desbloqueo exitoso:{C.RESET} {C.BOLD}{mac}{C.RESET}\n")
 
 
-def interactive_mode(api):
-    """Modo interactivo cuando se ejecuta sin argumentos."""
-    # Mostrar dispositivos conocidos para facilitar selección
+def build_device_map(api) -> dict:
+    """Construye mapa ip -> {name, mac, static} combinando DHCP y ARP."""
     leases = api.command("/ip/dhcp-server/lease/print")
     arp    = api.command("/ip/arp/print")
 
-    ip_name = {}
-    dhcp_ips = set()
+    devices = {}
     for l in leases:
-        ip = l.get("address", "")
-        dhcp_ips.add(ip)
-        ip_name[ip] = resolve_device_name(
-            ip, l.get("mac-address",""), l.get("host-name",""), False)
+        ip  = l.get("address", "")
+        mac = l.get("mac-address", "")
+        if ip:
+            devices[ip] = {
+                "mac":    mac,
+                "name":   resolve_device_name(ip, mac, l.get("host-name",""), False),
+                "static": False,
+            }
     for e in arp:
-        ip = e.get("address","")
-        if ip.startswith("192.168.") and ip not in ip_name:
-            ip_name[ip] = resolve_device_name(ip, e.get("mac-address",""), "", True)
+        ip  = e.get("address", "")
+        mac = e.get("mac-address", "")
+        if ip.startswith("192.168.") and ip not in devices and mac:
+            devices[ip] = {
+                "mac":    mac,
+                "name":   resolve_device_name(ip, mac, "", True),
+                "static": True,
+            }
+    return devices
 
-    print(f"\n{C.HEADER}  Gestión de bloqueo de IPs{C.RESET}\n")
-    print(f"  {C.BOLD}[1]{C.RESET} Bloquear una IP")
-    print(f"  {C.BOLD}[2]{C.RESET} Desbloquear una IP")
-    print(f"  {C.BOLD}[3]{C.RESET} Ver IPs bloqueadas")
+
+def print_device_table(devices: dict):
+    """Imprime la lista de dispositivos con IP, MAC y nombre."""
+    print(f"\n  {'IP':<18} {'MAC':<20} NOMBRE")
+    print(f"  {'─'*65}")
+    for ip in sorted(devices.keys(), key=lambda x: list(map(int, x.split(".")))):
+        d = devices[ip]
+        print(f"  {ip:<18} {d['mac']:<20} {d['name']}")
+    print()
+
+
+def interactive_mode(api):
+    devices = build_device_map(api)
+
+    print(f"\n{C.HEADER}  Gestión de bloqueo de dispositivos{C.RESET}\n")
+    print(f"  {C.BOLD}[1]{C.RESET} Bloquear un dispositivo (por MAC)")
+    print(f"  {C.BOLD}[2]{C.RESET} Desbloquear un dispositivo (por MAC)")
+    print(f"  {C.BOLD}[3]{C.RESET} Ver dispositivos bloqueados")
     print(f"  {C.BOLD}[0]{C.RESET} Volver al menú\n")
 
     opcion = input(f"  {C.CYAN}Selecciona una opción: {C.RESET}").strip()
 
     if opcion == "1":
-        print(f"\n  Dispositivos en la red:\n")
-        sorted_ips = sorted(ip_name.keys(),
-                           key=lambda x: list(map(int, x.split("."))))
-        for ip in sorted_ips:
-            print(f"    {ip:<16}  {ip_name[ip]}")
-        ip = input(f"\n  {C.CYAN}IP a bloquear: {C.RESET}").strip()
-        if ip:
-            confirm = input(f"  {C.WARN}¿Confirmar bloqueo de {ip}? [s/N]: {C.RESET}").strip().lower()
-            if confirm == "s":
-                block_ip(api, ip)
-            else:
-                print(f"  {C.DIM}Cancelado.{C.RESET}\n")
+        print_device_table(devices)
+        print(f"  {C.DIM}Puedes ingresar la IP (ej: 192.168.1.60) o la MAC directamente.{C.RESET}")
+        entrada = input(f"\n  {C.CYAN}IP o MAC a bloquear: {C.RESET}").strip()
+        if not entrada:
+            return
+
+        # Resolver MAC si ingresó una IP
+        if "." in entrada:
+            ip = entrada
+            d  = devices.get(ip)
+            if not d or not d["mac"]:
+                print(f"\n  {C.WARN}No se encontró MAC para {ip}. Ingresa la MAC manualmente.{C.RESET}\n")
+                return
+            mac  = d["mac"]
+            name = d["name"]
+            print(f"\n  {C.DIM}Dispositivo: {name} — MAC: {mac}{C.RESET}")
+        else:
+            mac  = entrada
+            name = mac
+
+        confirm = input(f"  {C.WARN}¿Confirmar bloqueo de {name} ({mac})? [s/N]: {C.RESET}").strip().lower()
+        if confirm == "s":
+            block_mac(api, mac)
+        else:
+            print(f"  {C.DIM}Cancelado.{C.RESET}\n")
 
     elif opcion == "2":
         list_blocked(api)
-        ip = input(f"  {C.CYAN}IP a desbloquear: {C.RESET}").strip()
-        if ip:
-            unblock_ip(api, ip)
+        print_device_table(devices)
+        entrada = input(f"  {C.CYAN}IP o MAC a desbloquear: {C.RESET}").strip()
+        if not entrada:
+            return
+        if "." in entrada:
+            d = devices.get(entrada)
+            if not d or not d["mac"]:
+                print(f"\n  {C.WARN}No se encontró MAC para {entrada}.{C.RESET}\n")
+                return
+            entrada = d["mac"]
+        unblock_mac(api, entrada)
 
     elif opcion == "3":
         list_blocked(api)
@@ -131,11 +179,11 @@ def interactive_mode(api):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Bloquear/desbloquear IPs en el firewall MikroTik")
-    parser.add_argument("--block",   metavar="IP", help="Bloquear esta IP")
-    parser.add_argument("--unblock", metavar="IP", help="Desbloquear esta IP")
+        description="Bloquear/desbloquear dispositivos por MAC en MikroTik")
+    parser.add_argument("--block",   metavar="MAC", help="Bloquear esta MAC")
+    parser.add_argument("--unblock", metavar="MAC", help="Desbloquear esta MAC")
     parser.add_argument("--list",    action="store_true",
-                        help="Listar IPs bloqueadas")
+                        help="Listar MACs bloqueadas")
     args = parser.parse_args()
 
     cfg = load_config()
@@ -145,9 +193,9 @@ def main():
         if args.list:
             list_blocked(api)
         elif args.block:
-            block_ip(api, args.block)
+            block_mac(api, args.block)
         elif args.unblock:
-            unblock_ip(api, args.unblock)
+            unblock_mac(api, args.unblock)
         else:
             interactive_mode(api)
 
