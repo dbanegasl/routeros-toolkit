@@ -110,21 +110,39 @@ def build_device_map(api) -> dict:
     return devices
 
 
-def print_device_table(devices: dict, blocked_macs: set):
-    """Imprime la lista de dispositivos con estado de bloqueo, IP, MAC y nombre."""
-    print(f"\n  {'':3} {'IP':<18} {'MAC':<20} NOMBRE")
-    print(f"  {'─'*70}")
-    for ip in sorted(devices.keys(), key=lambda x: list(map(int, x.split(".")))):
-        d   = devices[ip]
-        mac = d['mac'].upper()
-        if mac in blocked_macs:
-            status = f"{C.ERR}🔒{C.RESET}"
-            row    = f"{C.ERR}{ip:<18} {d['mac']:<20} {d['name']}{C.RESET}"
+def print_active_table(devices: dict, blocked_macs: set):
+    """Lista solo dispositivos ACTIVOS (no bloqueados) — para acción Bloquear."""
+    activos = {ip: d for ip, d in devices.items()
+               if d['mac'].upper() not in blocked_macs}
+    if not activos:
+        print(f"\n  {C.WARN}Todos los dispositivos están bloqueados.{C.RESET}\n")
+        return
+    print(f"\n  {C.GREEN}Dispositivos activos:{C.RESET}")
+    print(f"\n  {'IP':<18} {'MAC':<20} NOMBRE")
+    print(f"  {'─'*65}")
+    for ip in sorted(activos.keys(), key=lambda x: list(map(int, x.split(".")))):
+        d = activos[ip]
+        print(f"  {ip:<18} {d['mac']:<20} {d['name']}")
+    print()
+
+
+def print_blocked_table(devices: dict, blocked_macs: set):
+    """Lista solo dispositivos BLOQUEADOS — para acción Desbloquear."""
+    # Cruzar MACs bloqueadas con el mapa de devices para mostrar info completa
+    mac_to_device = {d['mac'].upper(): (ip, d) for ip, d in devices.items()}
+    if not blocked_macs:
+        print(f"\n  {C.GREEN}No hay dispositivos bloqueados.{C.RESET}\n")
+        return
+    print(f"\n  {C.ERR}Dispositivos bloqueados:{C.RESET}")
+    print(f"\n  {'IP':<18} {'MAC':<20} NOMBRE")
+    print(f"  {'─'*65}")
+    for mac in sorted(blocked_macs):
+        if mac in mac_to_device:
+            ip, d = mac_to_device[mac]
+            print(f"  {C.ERR}🔒{C.RESET} {ip:<16} {d['mac']:<20} {C.ERR}{d['name']}{C.RESET}")
         else:
-            status = f"{C.DIM}  {C.RESET}"
-            row    = f"{ip:<18} {d['mac']:<20} {d['name']}"
-        print(f"  {status} {row}")
-    print(f"\n  {C.ERR}🔒{C.RESET} = bloqueado   {C.DIM}sin ícono = activo{C.RESET}\n")
+            print(f"  {C.ERR}🔒{C.RESET} {'—':<16} {mac:<20} {C.DIM}(no está en la red ahora){C.RESET}")
+    print()
 
 
 def interactive_mode(api):
@@ -140,13 +158,13 @@ def interactive_mode(api):
     opcion = input(f"  {C.CYAN}Selecciona una opción: {C.RESET}").strip()
 
     if opcion == "1":
-        print_device_table(devices, blocked_macs)
+        # Muestra solo activos — sin ruido de los ya bloqueados
+        print_active_table(devices, blocked_macs)
         print(f"  {C.DIM}Puedes ingresar la IP (ej: 192.168.1.60) o la MAC directamente.{C.RESET}")
         entrada = input(f"\n  {C.CYAN}IP o MAC a bloquear: {C.RESET}").strip()
         if not entrada:
             return
 
-        # Resolver MAC si ingresó una IP
         if "." in entrada:
             ip = entrada
             d  = devices.get(ip)
@@ -167,7 +185,10 @@ def interactive_mode(api):
             print(f"  {C.DIM}Cancelado.{C.RESET}\n")
 
     elif opcion == "2":
-        print_device_table(devices, blocked_macs)
+        # Muestra solo bloqueados — lo que tiene sentido desbloquear
+        print_blocked_table(devices, blocked_macs)
+        if not blocked_macs:
+            return
         entrada = input(f"  {C.CYAN}IP o MAC a desbloquear: {C.RESET}").strip()
         if not entrada:
             return
