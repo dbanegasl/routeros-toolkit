@@ -110,18 +110,26 @@ def build_device_map(api) -> dict:
     return devices
 
 
-def print_device_table(devices: dict):
-    """Imprime la lista de dispositivos con IP, MAC y nombre."""
-    print(f"\n  {'IP':<18} {'MAC':<20} NOMBRE")
-    print(f"  {'─'*65}")
+def print_device_table(devices: dict, blocked_macs: set):
+    """Imprime la lista de dispositivos con estado de bloqueo, IP, MAC y nombre."""
+    print(f"\n  {'':3} {'IP':<18} {'MAC':<20} NOMBRE")
+    print(f"  {'─'*70}")
     for ip in sorted(devices.keys(), key=lambda x: list(map(int, x.split(".")))):
-        d = devices[ip]
-        print(f"  {ip:<18} {d['mac']:<20} {d['name']}")
-    print()
+        d   = devices[ip]
+        mac = d['mac'].upper()
+        if mac in blocked_macs:
+            status = f"{C.ERR}🔒{C.RESET}"
+            row    = f"{C.ERR}{ip:<18} {d['mac']:<20} {d['name']}{C.RESET}"
+        else:
+            status = f"{C.DIM}  {C.RESET}"
+            row    = f"{ip:<18} {d['mac']:<20} {d['name']}"
+        print(f"  {status} {row}")
+    print(f"\n  {C.ERR}🔒{C.RESET} = bloqueado   {C.DIM}sin ícono = activo{C.RESET}\n")
 
 
 def interactive_mode(api):
-    devices = build_device_map(api)
+    devices      = build_device_map(api)
+    blocked_macs = {r.get("src-mac-address","").upper() for r in get_blocked(api)}
 
     print(f"\n{C.HEADER}  Gestión de bloqueo de dispositivos{C.RESET}\n")
     print(f"  {C.BOLD}[1]{C.RESET} Bloquear un dispositivo (por MAC)")
@@ -132,7 +140,7 @@ def interactive_mode(api):
     opcion = input(f"  {C.CYAN}Selecciona una opción: {C.RESET}").strip()
 
     if opcion == "1":
-        print_device_table(devices)
+        print_device_table(devices, blocked_macs)
         print(f"  {C.DIM}Puedes ingresar la IP (ej: 192.168.1.60) o la MAC directamente.{C.RESET}")
         entrada = input(f"\n  {C.CYAN}IP o MAC a bloquear: {C.RESET}").strip()
         if not entrada:
@@ -159,8 +167,7 @@ def interactive_mode(api):
             print(f"  {C.DIM}Cancelado.{C.RESET}\n")
 
     elif opcion == "2":
-        list_blocked(api)
-        print_device_table(devices)
+        print_device_table(devices, blocked_macs)
         entrada = input(f"  {C.CYAN}IP o MAC a desbloquear: {C.RESET}").strip()
         if not entrada:
             return
