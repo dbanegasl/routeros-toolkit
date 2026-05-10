@@ -98,6 +98,23 @@ MENU = {
              "Muestra solo teléfonos y tablets (incluyendo MAC privada)"),
         ],
     },
+    "schedule": {
+        "title": "⏰  HORARIO DE INTERNET",
+        "items": [
+            ("18", "Programar corte de internet",
+             "09_schedule_internet.py", "",
+             "Bloquea TODOS en un horario — configura inicio, fin y días"),
+            ("19", "Ver estado del corte",
+             "09_schedule_internet.py", "--list",
+             "Muestra horario activo y lista blanca de excepciones"),
+            ("20", "Gestionar lista blanca (excepciones)",
+             "09_schedule_internet.py", "--allow",
+             "Elige qué dispositivos siempre tienen internet (WiFi, cámaras…)"),
+            ("21", "Eliminar corte programado",
+             "09_schedule_internet.py", "--remove",
+             "Borra todas las reglas — internet libre para todos"),
+        ],
+    },
     "system": {
         "title": "⚙️   SISTEMA",
         "items": [
