@@ -26,32 +26,16 @@ import argparse
 from collections import defaultdict
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from lib import MikroTikAPI, load_config, fmt_speed, fmt_bytes, resolve_device_name, C
+from lib import (MikroTikAPI, load_config, fmt_speed, fmt_bytes,
+                 build_name_map, C, get_lan_prefix,
+                 run_script)
 
 
 def clear_screen():
     print("\033[H\033[J", end="", flush=True)
 
 
-def build_ip_name_map(api) -> dict:
-    """Construye el mapa IP→nombre desde DHCP y ARP."""
-    leases = api.command("/ip/dhcp-server/lease/print")
-    dhcp_ips = set()
-    ip_info = {}
-    for l in leases:
-        ip, mac, hostname = l.get("address",""), l.get("mac-address",""), l.get("host-name","")
-        dhcp_ips.add(ip)
-        ip_info[ip] = (mac, hostname, False)
-    arp = api.command("/ip/arp/print")
-    for e in arp:
-        ip, mac = e.get("address",""), e.get("mac-address","")
-        if ip.startswith("192.168.") and ip not in ip_info:
-            ip_info[ip] = (mac, "", True)
-    return {ip: resolve_device_name(ip, mac, hn, static)
-            for ip, (mac, hn, static) in ip_info.items()}
-
-
-def get_snapshot(api) -> dict:
+def get_snapshot(api, lan: str) -> dict:
     """
     Lee el connection tracking y retorna métricas acumuladas por IP.
     Retorna dict: ip → {'dl_rate', 'ul_rate', 'dl_total', 'ul_total', 'conns'}
@@ -61,7 +45,7 @@ def get_snapshot(api) -> dict:
                                           dl_total=0, ul_total=0, conns=0))
     for c in conns:
         src = c.get("src-address", "").split(":")[0]
-        if not src.startswith("192.168."):
+        if not src.startswith(lan):
             continue
         d = data[src]
         d["dl_rate"]  += int(c.get("repl-rate", 0))
@@ -130,7 +114,8 @@ def main():
 
     with MikroTikAPI(**cfg) as api:
         print("Cargando dispositivos...")
-        ip_name = build_ip_name_map(api)
+        ip_name = build_name_map(api)
+        lan = get_lan_prefix(api)
 
         iteration = 0
         print("Iniciando monitor... (Ctrl+C para salir)")
@@ -139,7 +124,7 @@ def main():
         try:
             while True:
                 t0 = time.time()
-                snapshot, total_conns = get_snapshot(api)
+                snapshot, total_conns = get_snapshot(api, lan)
                 elapsed = time.time() - t0
                 iteration += 1
                 render(snapshot, ip_name, args.top, cfg["host"],
@@ -151,4 +136,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_script(main)

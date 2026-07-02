@@ -45,36 +45,9 @@ import argparse
 from collections import defaultdict
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from lib import MikroTikAPI, load_config, fmt_speed, fmt_bytes, resolve_device_name, C
-
-
-def build_name_map(api) -> dict:
-    """
-    Construye un mapa IP → (nombre_display, es_estática) combinando DHCP y ARP.
-    Las IPs que aparecen en ARP pero no en DHCP se marcan como estáticas.
-    """
-    leases = api.command("/ip/dhcp-server/lease/print")
-    dhcp_ips = set()
-    ip_info: dict = {}  # ip → (mac, hostname)
-
-    for l in leases:
-        ip  = l.get("address", "")
-        mac = l.get("mac-address", "")
-        name = l.get("host-name", "")
-        dhcp_ips.add(ip)
-        ip_info[ip] = (mac, name, False)
-
-    arp = api.command("/ip/arp/print")
-    for e in arp:
-        ip  = e.get("address", "")
-        mac = e.get("mac-address", "")
-        if ip.startswith("192.168.") and ip not in ip_info:
-            ip_info[ip] = (mac, "", True)   # IP estática
-
-    return {
-        ip: resolve_device_name(ip, mac, hostname, is_static)
-        for ip, (mac, hostname, is_static) in ip_info.items()
-    }
+from lib import (MikroTikAPI, load_config, fmt_speed, fmt_bytes,
+                 build_name_map, C, get_lan_prefix,
+                 run_script)
 
 
 def main():
@@ -97,6 +70,7 @@ def main():
     with MikroTikAPI(**cfg) as api:
 
         ip_name = build_name_map(api)
+        lan = get_lan_prefix(api)
 
         # Leer todas las conexiones activas
         conns = api.command("/ip/firewall/connection/print")
@@ -110,7 +84,7 @@ def main():
 
         for c in conns:
             src = c.get("src-address", "").split(":")[0]
-            if not src.startswith("192.168."):
+            if not src.startswith(lan):
                 continue
             dl_rate[src]   += int(c.get("repl-rate", 0))
             ul_rate[src]   += int(c.get("orig-rate", 0))
@@ -186,5 +160,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_script(main)
 

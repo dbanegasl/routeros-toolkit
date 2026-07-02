@@ -23,6 +23,11 @@ Orden de procesamiento en RouterOS (top-down, primera coincidencia gana):
     ✅  Completamente reversible con --remove.
     ✅  Nuevos dispositivos quedan bloqueados por defecto.
 
+Persistencia:
+    La lista blanca se guarda en config/whitelist.json y sobrevive a
+    --remove: al programar un nuevo corte se reaplica automáticamente
+    sin tener que agregar los dispositivos de nuevo.
+
 Requisito: router con hora correcta (NTP activo).
 
 Uso:
@@ -34,17 +39,21 @@ Uso:
 
 import sys
 import os
-import re
 import argparse
+from datetime import date
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from lib import MikroTikAPI, load_config, resolve_device_name, get_mac_vendor_cache, C
+from lib import (MikroTikAPI, load_config, build_device_map,
+                 get_mac_vendor_cache, C, load_json_config, save_json_config,
+                 run_script)
 
 # Tags para identificar nuestras reglas
-DROP_TAG      = "HORARIO-INTERNET"   # la regla DROP global
-ALLOW_TAG     = "HORARIO-PERMITIDO"  # reglas ACCEPT por MAC (lista blanca)
-SCHED_ON_TAG  = "HORARIO-ON"         # scheduler que activa el corte
-SCHED_OFF_TAG = "HORARIO-OFF"        # scheduler que desactiva el corte
+DROP_TAG  = "HORARIO-INTERNET"       # la regla DROP global
+ALLOW_TAG = "HORARIO-PERMITIDO"      # reglas ACCEPT por MAC (lista blanca)
+
+# Archivo de persistencia: la lista blanca sobrevive a --remove,
+# así no hay que rearmarla a mano al reprogramar un corte.
+WHITELIST_CONFIG = "whitelist"       # → config/whitelist.json
 
 DAYS_MAP = {
     "1": "mon", "2": "tue", "3": "wed",
@@ -66,20 +75,11 @@ def get_wan_interface(api) -> str:
     for r in routes:
         if r.get("dst-address") == "0.0.0.0/0" and r.get("active") == "true":
             iface = r.get("interface", "")
-            if not iface:
-                # RouterOS 6: la interfaz viene en gateway-status ("x.x.x.x reachable via ether1")
-                gw_status = r.get("gateway-status", "")
-                if " via " in gw_status:
-                    iface = gw_status.split(" via ")[-1].strip()
             if iface:
                 return iface
     for r in routes:
         if r.get("dst-address") == "0.0.0.0/0":
             iface = r.get("interface", "")
-            if not iface:
-                gw_status = r.get("gateway-status", "")
-                if " via " in gw_status:
-                    iface = gw_status.split(" via ")[-1].strip()
             if iface:
                 return iface
     return ""
@@ -103,32 +103,8 @@ def get_allow_rules(api) -> list:
             if r.get("comment", "").startswith(ALLOW_TAG)]
 
 
-def get_schedules(api) -> tuple:
-    """Retorna (on_sched, off_sched) del router o (None, None)."""
-    on_s = off_s = None
-    for s in api.command("/system/scheduler/print"):
-        nm = s.get("name", "")
-        if nm == SCHED_ON_TAG:    on_s = s
-        elif nm == SCHED_OFF_TAG: off_s = s
-    return on_s, off_s
-
-
-def parse_drop_time(rule: dict, api=None) -> tuple:
-    """Extrae (start, end, days) del scheduler (preferido) o del campo time (legado).
-
-    Retorna tiempos en formato HH:MM:SS o cadena vacía si no disponible.
-    """
-    if api:
-        on_s, off_s = get_schedules(api)
-        if on_s or off_s:
-            start = on_s.get("start-time", "") if on_s else ""
-            end   = off_s.get("start-time", "") if off_s else ""
-            # Días guardados en el comment del scheduler ON
-            days_raw = (on_s or off_s).get("comment", "")
-            days = [d for d in days_raw.split(",") if d in DAYS_LABEL] or list(ALL_DAYS)
-            return start, end, days
-
-    # Legado: leer del campo time de la regla (formato RouterOS duración)
+def parse_drop_time(rule: dict) -> tuple[str, str, list]:
+    """Extrae (start, end, days) del campo time de la regla DROP."""
     time_val = rule.get("time", "")
     start, end, days = "", "", list(ALL_DAYS)
     if time_val:
@@ -140,7 +116,11 @@ def parse_drop_time(rule: dict, api=None) -> tuple:
 
 
 def remove_all_rules(api) -> int:
-    """Elimina todas las reglas (DROP + ACCEPT) y los schedulers de este script."""
+    """Elimina todas las reglas (DROP + ACCEPT) de este script.
+
+    NO borra config/whitelist.json: la lista blanca persiste y se
+    reaplica automáticamente al programar un nuevo corte.
+    """
     to_remove = [
         r[".id"] for r in api.command("/ip/firewall/filter/print")
         if r.get("comment", "") == DROP_TAG
@@ -148,48 +128,40 @@ def remove_all_rules(api) -> int:
     ]
     for rid in to_remove:
         api.command("/ip/firewall/filter/remove", params=[f"=.id={rid}"])
-
-    # Eliminar schedulers
-    for s in api.command("/system/scheduler/print"):
-        if s.get("name") in (SCHED_ON_TAG, SCHED_OFF_TAG):
-            api.command("/system/scheduler/remove", params=[f"=.id={s['.id']}"])
-            to_remove.append(s[".id"])
-
     return len(to_remove)
 
 
 # ---------------------------------------------------------------------------
-# Mapa de dispositivos de la red
+# Lista blanca persistente (config/whitelist.json)
 # ---------------------------------------------------------------------------
 
-def build_device_map(api) -> dict:
-    """MAC_upper → {mac, ip, name}"""
-    leases  = api.command("/ip/dhcp-server/lease/print")
-    arp     = api.command("/ip/arp/print")
-    devices = {}
+def load_whitelist() -> dict:
+    """MAC_upper → {mac, nombre, agregado} desde config/whitelist.json."""
+    data = load_json_config(WHITELIST_CONFIG, default={"dispositivos": []})
+    return {d["mac"].upper(): d
+            for d in data.get("dispositivos", []) if d.get("mac")}
 
-    for l in leases:
-        ip       = l.get("address", "")
-        mac      = l.get("mac-address", "")
-        hostname = l.get("host-name", "")
-        if mac:
-            devices[mac.upper()] = {
-                "mac":      mac,
-                "ip":       ip,
-                "hostname": hostname,
-                "name":     resolve_device_name(ip, mac, hostname, False),
-            }
-    for e in arp:
-        ip  = e.get("address", "")
-        mac = e.get("mac-address", "")
-        if mac and mac.upper() not in devices and ip.startswith("192.168."):
-            devices[mac.upper()] = {
-                "mac":      mac,
-                "ip":       ip,
-                "hostname": "",
-                "name":     resolve_device_name(ip, mac, "", True),
-            }
-    return devices
+
+def save_whitelist(macs: set, devices: dict, previous: dict):
+    """Persiste la lista blanca conservando nombre/fecha de entradas previas.
+
+    Args:
+        macs     — set de MACs (upper) que forman la nueva lista blanca
+        devices  — mapa de dispositivos de la red (para resolver nombres)
+        previous — whitelist anterior (para no perder nombre/fecha si el
+                   dispositivo no está conectado ahora)
+    """
+    items = []
+    for mac in sorted(macs):
+        prev = previous.get(mac, {})
+        nombre = (devices.get(mac, {}).get("name")
+                  or prev.get("nombre", ""))
+        items.append({
+            "mac": mac,
+            "nombre": nombre,
+            "agregado": prev.get("agregado", date.today().isoformat()),
+        })
+    save_json_config(WHITELIST_CONFIG, {"dispositivos": items})
 
 
 # ---------------------------------------------------------------------------
@@ -235,15 +207,11 @@ def ask_days() -> list:
 def apply_all_rules(api, wan: str, start: str, end: str,
                     days: list, allowed_macs: list):
     """
-    Crea las ACCEPT (lista blanca) y la regla DROP controlada por Scheduler.
-
-    Estrategia (evita el matcher `time` que da invalid=true en RouterOS 6):
-      1. Regla DROP sin parámetro time — se habilita/deshabilita a via scheduler.
-      2. Scheduler HORARIO-ON:  habilita la DROP a la hora de inicio.
-      3. Scheduler HORARIO-OFF: deshabilita la DROP a la hora de fin.
+    Crea primero las ACCEPT (lista blanca) y luego la DROP global.
+    El orden es crítico: RouterOS procesa top-down, primera coincidencia gana.
     """
     days_str = ",".join(days)
-    all_days  = set(days) == set(ALL_DAYS)
+    time_val = f"{start}-{end},{days_str}"
 
     # 1. ACCEPT por MAC (sin restricción de tiempo → siempre pasan)
     for mac in allowed_macs:
@@ -255,48 +223,13 @@ def apply_all_rules(api, wan: str, start: str, end: str,
             f"=comment={ALLOW_TAG}-{mac.upper()}",
         ])
 
-    # 2. DROP global — empieza habilitada/deshabilitada según hora actual
-    router_secs = _get_router_time_secs(api)
-    in_window   = _is_in_time_window(router_secs, start, end) if router_secs >= 0 else False
+    # 2. DROP global con horario (para todos los demás)
     api.command("/ip/firewall/filter/add", params=[
         "=chain=forward",
         f"=out-interface={wan}",
         "=action=drop",
-        f"=disabled={'no' if in_window else 'yes'}",
+        f"=time={time_val}",
         f"=comment={DROP_TAG}",
-    ])
-
-    # 3. Scripts RouterOS para el scheduler
-    if all_days:
-        on_script  = f'/ip firewall filter set [find comment="{DROP_TAG}"] disabled=no'
-        off_script = f'/ip firewall filter set [find comment="{DROP_TAG}"] disabled=yes'
-    else:
-        ros_cond = " or ".join(f'$d="{d}"' for d in days)
-        on_script  = (f':local d [/system clock get day-of-week]; '
-                      f':if ({ros_cond}) do='
-                      f'{{ /ip firewall filter set [find comment="{DROP_TAG}"] disabled=no }}')
-        off_script = (f':local d [/system clock get day-of-week]; '
-                      f':if ({ros_cond}) do='
-                      f'{{ /ip firewall filter set [find comment="{DROP_TAG}"] disabled=yes }}')
-
-    # 4. Scheduler ON — activa el corte a la hora de inicio
-    api.command("/system/scheduler/add", params=[
-        f"=name={SCHED_ON_TAG}",
-        f"=start-time={start}",
-        "=interval=24:00:00",
-        f"=on-event={on_script}",
-        "=policy=read,write,policy,test",
-        f"=comment={days_str}",
-    ])
-
-    # 5. Scheduler OFF — desactiva el corte a la hora de fin
-    api.command("/system/scheduler/add", params=[
-        f"=name={SCHED_OFF_TAG}",
-        f"=start-time={end}",
-        "=interval=24:00:00",
-        f"=on-event={off_script}",
-        "=policy=read,write,policy,test",
-        f"=comment={days_str}",
     ])
 
 
@@ -304,61 +237,9 @@ def apply_all_rules(api, wan: str, start: str, end: str,
 # Ver estado actual
 # ---------------------------------------------------------------------------
 
-def _routeros_dur_to_secs(t: str) -> int:
-    """Convierte tiempo RouterOS a segundos desde medianoche.
-
-    Acepta formato duración ('1h', '5h59m', '1h30m') y reloj ('01:00:00').
-    """
-    if ":" in t:
-        parts = t.split(":")
-        h = int(parts[0]) if len(parts) > 0 else 0
-        m = int(parts[1]) if len(parts) > 1 else 0
-        s = int(parts[2]) if len(parts) > 2 else 0
-        return h * 3600 + m * 60 + s
-    total = 0
-    for val, unit in re.findall(r"(\d+)([hms])", t):
-        n = int(val)
-        if unit == "h":   total += n * 3600
-        elif unit == "m": total += n * 60
-        elif unit == "s": total += n
-    return total
-
-
-def _secs_to_hhmm(secs: int) -> str:
-    """Convierte segundos desde medianoche a 'HH:MM'."""
-    h = (secs // 3600) % 24
-    m = (secs % 3600) // 60
-    return f"{h:02d}:{m:02d}"
-
-
-def _is_in_time_window(current_secs: int, start: str, end: str) -> bool:
-    """Devuelve True si la hora actual está dentro del rango de bloqueo."""
-    s = _routeros_dur_to_secs(start)
-    e = _routeros_dur_to_secs(end)
-    if s <= e:
-        return s <= current_secs <= e
-    # Rango que cruza medianoche (ej. 22:00 → 06:00)
-    return current_secs >= s or current_secs <= e
-
-
-def _get_router_time_secs(api) -> int:
-    """Devuelve la hora actual del router como segundos desde medianoche, o -1 si falla."""
-    try:
-        clock = api.command("/system/clock/print")
-        if clock:
-            h, m, s = map(int, clock[0].get("time", "00:00:00").split(":"))
-            return h * 3600 + m * 60 + s
-    except Exception:
-        pass
-    return -1
-
-
 def _fmt_counter(val: str) -> str:
     """Formatea bytes/paquetes con sufijo K/M."""
-    try:
-        n = int(val)
-    except (ValueError, TypeError):
-        return "—"
+    n = int(val)
     if n >= 1_000_000:
         return f"{n/1_000_000:.1f}M"
     if n >= 1_000:
@@ -369,54 +250,53 @@ def _fmt_counter(val: str) -> str:
 def list_rules(api):
     drop    = get_drop_rule(api)
     allows  = get_allow_rules(api)
-    devices = build_device_map(api)
+    stored  = load_whitelist()
+    devices = build_device_map(api, by="mac")
 
     print(f"\n  {C.BOLD}{'═'*65}{C.RESET}")
     print(f"  {C.HEADER}  ⏰  Estado del corte de internet por horario{C.RESET}")
     print(f"  {C.BOLD}{'═'*65}{C.RESET}")
 
     if not drop:
-        print(f"\n  {C.GREEN}No hay ningún corte programado.{C.RESET}\n")
+        print(f"\n  {C.GREEN}No hay ningún corte programado.{C.RESET}")
+        if stored:
+            print(f"\n  {C.DIM}💾 Lista blanca guardada "
+                  f"({len(stored)} dispositivo(s)) — se aplicará "
+                  f"automáticamente al programar un corte:{C.RESET}")
+            for mac in sorted(stored):
+                nombre = stored[mac].get("nombre") or "—"
+                print(f"     {C.GREEN}✓{C.RESET} {mac:<20} {nombre}")
+        print()
         return
 
-    start, end, days = parse_drop_time(drop, api)
+    # Desincronización archivo ↔ router
+    applied_macs = {r.get("src-mac-address", "").upper() for r in allows}
+    solo_archivo = set(stored) - applied_macs
+    solo_router  = applied_macs - set(stored)
+    if solo_archivo:
+        print(f"\n  {C.WARN}⚠️  {len(solo_archivo)} dispositivo(s) del archivo "
+              f"NO están aplicados en el router:{C.RESET}")
+        for mac in sorted(solo_archivo):
+            print(f"     • {mac} {stored[mac].get('nombre', '')}")
+        print(f"  {C.DIM}Ejecuta --allow y confirma para sincronizar.{C.RESET}")
+    if solo_router:
+        print(f"\n  {C.WARN}⚠️  {len(solo_router)} regla(s) del router no "
+              f"están en config/whitelist.json (se agregarán al usar --allow).{C.RESET}")
+
+    start, end, days = parse_drop_time(drop)
     days_labels = ", ".join(DAYS_LABEL.get(d, d) for d in days)
 
-    # Determinar si el corte está activo AHORA según la hora del router
-    router_secs = _get_router_time_secs(api)
-    in_window   = _is_in_time_window(router_secs, start, end) if router_secs >= 0 else None
-
-    # ¿Está la regla habilitada en este momento?
-    rule_enabled = drop.get("disabled", "true") == "false"
-
-    # ¿Hay schedulers configurados?
-    on_s, off_s = get_schedules(api)
-    has_scheduler = bool(on_s or off_s)
-
-    # Formatear horario para mostrar (acepta HH:MM:SS o duración RouterOS)
-    start_disp = _secs_to_hhmm(_routeros_dur_to_secs(start)) if start else "?"
-    end_disp   = _secs_to_hhmm(_routeros_dur_to_secs(end))   if end   else "?"
-
     # Contadores de la regla DROP
-    pkts   = _fmt_counter(drop.get("packets", "0"))
-    bytes_ = _fmt_counter(drop.get("bytes",   "0"))
+    pkts  = _fmt_counter(drop.get("packets", "0"))
+    bytes_ = _fmt_counter(drop.get("bytes", "0"))
     if drop.get("packets", "0") != "0":
-        hit_str = f"{C.ERR}🚫 {pkts} paquetes bloqueados ({bytes_}){C.RESET}"
+        hit_str = f"{C.ERR}🚫 {pkts} paquetes bloqueados ({bytes_} B){C.RESET}"
     else:
-        hit_str = f"{C.DIM}Sin actividad (0 paquetes){C.RESET}"
+        hit_str = f"{C.DIM}Sin actividad aún (0 paquetes){C.RESET}"
 
-    if drop.get("invalid") == "true":
-        print(f"\n  {C.WARN}⚠️  La regla tiene invalid=true — usa --remove y reconfigurar.{C.RESET}")
-    elif not has_scheduler:
-        print(f"\n  {C.WARN}⚠️  Sin scheduler — el corte no se activará automáticamente.{C.RESET}")
-        print(f"  {C.DIM}Usa --remove y vuelve a configurar.{C.RESET}")
-    elif rule_enabled:
-        print(f"\n  {C.ERR}🔴 Corte ACTIVO ahora:{C.RESET}")
-    else:
-        print(f"\n  {C.OK}🟢 Corte configurado — inactivo ahora (fuera de horario):{C.RESET}")
-
-    print(f"     Interfaz WAN    : {C.CYAN}{drop.get('out-interface', '?')}{C.RESET}")
-    print(f"     Sin internet    : {C.ERR}{start_disp}{C.RESET} → {C.ERR}{end_disp}{C.RESET}")
+    print(f"\n  {C.ERR}🔴 Corte activo:{C.RESET}")
+    print(f"     Interfaz WAN    : {C.CYAN}{drop.get('out-interface','?')}{C.RESET}")
+    print(f"     Sin internet    : {C.ERR}{start[:5]}{C.RESET} → {C.ERR}{end[:5]}{C.RESET}")
     print(f"     Días            : {days_labels}")
     print(f"     Afecta a        : {C.BOLD}TODOS{C.RESET} los no listados abajo")
     print(f"     Tráfico cortado : {hit_str}")
@@ -449,21 +329,28 @@ def list_rules(api):
 # ---------------------------------------------------------------------------
 
 def interactive_allow(api):
-    """Agregar/quitar dispositivos de la lista blanca (siempre con internet)."""
+    """Agregar/quitar dispositivos de la lista blanca (siempre con internet).
+
+    La lista se persiste en config/whitelist.json y sobrevive a --remove.
+    """
     drop         = get_drop_rule(api)
     allows       = get_allow_rules(api)
-    allowed_macs = {r.get("src-mac-address", "").upper() for r in allows}
-    devices      = build_device_map(api)
+    stored       = load_whitelist()
+    # Unión de lo aplicado en el router y lo persistido en el archivo:
+    # así nada se pierde aunque estén desincronizados.
+    allowed_macs = ({r.get("src-mac-address", "").upper() for r in allows}
+                    | set(stored))
+    devices      = build_device_map(api, by="mac")
 
     print(f"\n  {C.BOLD}{'═'*65}{C.RESET}")
     print(f"  {C.HEADER}  🛡️   Lista blanca — excepciones al corte de internet{C.RESET}")
     print(f"  {C.BOLD}{'═'*65}{C.RESET}")
 
     if drop:
-        start, end, days = parse_drop_time(drop, api)
+        start, end, days = parse_drop_time(drop)
         wan         = drop.get("out-interface", "")
         days_labels = ", ".join(DAYS_LABEL.get(d, d) for d in days)
-        print(f"\n  {C.DIM}Corte programado: {_secs_to_hhmm(_routeros_dur_to_secs(start))} → {_secs_to_hhmm(_routeros_dur_to_secs(end))}  |  {days_labels}{C.RESET}")
+        print(f"\n  {C.DIM}Corte programado: {start[:5]} → {end[:5]}  |  {days_labels}{C.RESET}")
     else:
         wan = get_wan_interface(api)
         start = end = ""
@@ -497,6 +384,15 @@ def interactive_allow(api):
         vendor   = get_vendor(dev['mac']) or f"{C.DIM}?{C.RESET}"
         hostname = (dev.get('hostname') or f"{C.DIM}—{C.RESET}")[:20]
         print(f"  {idx:<4} {marca}   {dev['ip']:<16} {vendor:<16} {hostname:<20} {dev['name']}")
+        indexed.append(mac_up)
+
+    # Dispositivos de la lista blanca que no están conectados ahora:
+    # también se pueden quitar (toggle) aunque estén offline.
+    for mac_up in sorted(m for m in stored if m not in devices):
+        idx    = len(indexed) + 1
+        nombre = stored[mac_up].get("nombre") or mac_up
+        print(f"  {idx:<4} {C.GREEN}✓{C.RESET}   {'—':<16} {get_vendor(mac_up) or '?':<16} "
+              f"{'—':<20} {nombre} {C.DIM}(no conectado){C.RESET}")
         indexed.append(mac_up)
 
     print(f"\n  {C.GREEN}✓{C.RESET} = siempre con internet  "
@@ -536,6 +432,11 @@ def interactive_allow(api):
         print(f"  {C.DIM}Cancelado.{C.RESET}\n")
         return
 
+    # Persistir primero: el archivo es la fuente de verdad y sobrevive
+    # a un --remove (no hay que rearmar la lista al reprogramar).
+    save_whitelist(new_allowed, devices, stored)
+    print(f"\n  {C.DIM}💾 Lista blanca guardada en config/whitelist.json{C.RESET}")
+
     if drop:
         # Reconstruir reglas DROP + ACCEPT
         remove_all_rules(api)
@@ -544,7 +445,7 @@ def interactive_allow(api):
         print(f"\n  {C.GREEN}✅ Lista blanca actualizada.{C.RESET} "
               f"{n} dispositivo(s) siempre con internet.")
         print(f"  {C.DIM}El resto quedará sin internet de "
-              f"{_secs_to_hhmm(_routeros_dur_to_secs(start))} a {_secs_to_hhmm(_routeros_dur_to_secs(end))}.{C.RESET}\n")
+              f"{start[:5]} a {end[:5]}.{C.RESET}\n")
     else:
         # Solo guardar ACCEPT — el DROP se añade cuando configuren el horario
         for r in allows:
@@ -590,7 +491,13 @@ def interactive_mode(api):
 
     drop   = get_drop_rule(api)
     allows = get_allow_rules(api)
-    preserved_macs = [r.get("src-mac-address", "").upper() for r in allows]
+    stored = load_whitelist()
+    # Lista blanca = reglas ya aplicadas ∪ archivo persistido
+    preserved_macs = sorted(
+        {r.get("src-mac-address", "").upper() for r in allows} | set(stored))
+    if stored and not allows:
+        print(f"\n  {C.GREEN}💾 Lista blanca recuperada de config/whitelist.json "
+              f"({len(stored)} dispositivo(s)){C.RESET}")
 
     if drop:
         print(f"\n  {C.WARN}⚠️  Ya hay un corte programado:{C.RESET}")
@@ -625,6 +532,10 @@ def interactive_mode(api):
         return
 
     apply_all_rules(api, wan, start, end, days, preserved_macs)
+    if preserved_macs:
+        # Sincronizar el archivo con lo aplicado (nombres/fechas al día)
+        save_whitelist(set(preserved_macs),
+                       build_device_map(api, by="mac"), stored)
 
     print(f"\n  {C.ERR}🔴 Corte programado activo:{C.RESET}")
     print(f"     Sin internet : {C.BOLD}{start[:5]}{C.RESET} → {C.BOLD}{end[:5]}{C.RESET}  "
@@ -654,28 +565,30 @@ def main():
     args = parser.parse_args()
 
     cfg = load_config()
-    try:
-        with MikroTikAPI(**cfg) as api:
-            if args.list:
-                list_rules(api)
-            elif args.allow:
-                interactive_allow(api)
-            elif args.remove:
-                n = remove_all_rules(api)
-                if n:
-                    print(f"\n  {C.GREEN}✅ {n} regla(s) eliminada(s). "
-                          f"Internet sin restricciones.{C.RESET}\n")
-                else:
-                    print(f"\n  {C.GREEN}No había reglas de corte.{C.RESET}\n")
+    with MikroTikAPI(**cfg) as api:
+        if args.list:
+            list_rules(api)
+        elif args.allow:
+            interactive_allow(api)
+        elif args.remove:
+            n = remove_all_rules(api)
+            if n:
+                print(f"\n  {C.GREEN}✅ {n} regla(s) eliminada(s). "
+                      f"Internet sin restricciones.{C.RESET}")
             else:
-                interactive_mode(api)
-    except KeyboardInterrupt:
-        print(f"\n\n  {C.DIM}Cancelado.{C.RESET}\n")
-    except Exception as e:
-        print(f"\n  {C.ERR}❌ Error: {e}{C.RESET}\n")
-        sys.exit(1)
+                print(f"\n  {C.GREEN}No había reglas de corte.{C.RESET}")
+            stored = load_whitelist()
+            if stored:
+                print(f"  {C.DIM}💾 La lista blanca ({len(stored)} "
+                      f"dispositivo(s)) sigue guardada en "
+                      f"config/whitelist.json y se reaplicará al "
+                      f"programar un nuevo corte.{C.RESET}\n")
+            else:
+                print()
+        else:
+            interactive_mode(api)
 
 
 if __name__ == "__main__":
-    main()
+    run_script(main)
 

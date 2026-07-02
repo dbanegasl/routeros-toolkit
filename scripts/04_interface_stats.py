@@ -32,7 +32,7 @@ import time
 import argparse
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from lib import MikroTikAPI, load_config, fmt_speed, fmt_bytes
+from lib import MikroTikAPI, load_config, fmt_speed, fmt_bytes, run_script
 
 
 def get_iface_stats(api) -> dict:
@@ -128,4 +128,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_script(main)

@@ -24,15 +24,13 @@ Uso:
 import sys
 import os
 import argparse
-import json
 import re
-from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from lib import (MikroTikAPI, load_config, C,
-                 get_mac_vendor_cache, is_random_mac, lookup_mac_vendor_online)
-
-CACHE_FILE = Path(__file__).parent.parent / "lib" / "oui_cache.json"
+                 get_mac_vendor_cache, is_random_mac, lookup_mac_vendor_online,
+                 load_oui_cache, save_oui_cache,
+                 run_script)
 
 # Palabras clave en hostname que sugieren tipo de dispositivo
 MOBILE_KEYWORDS  = ["iphone", "ipad", "android", "samsung", "xiaomi", "redmi",
@@ -49,24 +47,6 @@ APPLE_OUIS = {
     "00:26:BB", "3C:07:54", "78:D7:5F", "F4:F1:5A", "DC:A4:CA",
     "B8:E8:56", "00:CD:FE", "F0:DB:F8", "70:56:81", "4C:57:CA",
 }
-
-
-def load_oui_cache() -> dict:
-    if CACHE_FILE.exists():
-        try:
-            with open(CACHE_FILE) as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {}
-
-
-def save_oui_cache(cache: dict):
-    try:
-        with open(CACHE_FILE, "w") as f:
-            json.dump(cache, f, indent=2)
-    except Exception:
-        pass
 
 
 def guess_device_type(mac: str, hostname: str, vendor: str) -> str:
@@ -272,4 +252,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_script(main)

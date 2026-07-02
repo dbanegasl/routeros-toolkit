@@ -22,7 +22,7 @@ import argparse
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from lib import MikroTikAPI, load_config, C
+from lib import MikroTikAPI, load_config, C, run_script
 
 
 LEVEL_COLOR = {
@@ -101,4 +101,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_script(main)

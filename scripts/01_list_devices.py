@@ -27,7 +27,7 @@ import os
 # Permite importar la lib desde cualquier directorio de trabajo
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from lib import MikroTikAPI, load_config, resolve_device_name, C
+from lib import MikroTikAPI, load_config, resolve_device_name, C, get_lan_prefix, run_script
 
 
 def main():
@@ -36,9 +36,10 @@ def main():
 
     with MikroTikAPI(**cfg) as api:
 
+        lan = get_lan_prefix(api)
         arp_entries = api.command("/ip/arp/print")
         arp_map = {e["address"]: e.get("mac-address", "") for e in arp_entries
-                   if e.get("address", "").startswith("192.168.")}
+                   if e.get("address", "").startswith(lan)}
 
         bridge_hosts = api.command("/interface/bridge/host/print")
         mac_to_port = {h["mac-address"]: h["interface"]
@@ -99,4 +100,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_script(main)

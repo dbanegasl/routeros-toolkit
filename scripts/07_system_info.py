@@ -21,7 +21,7 @@ import argparse
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from lib import MikroTikAPI, load_config, C
+from lib import MikroTikAPI, load_config, fmt_bytes, C, run_script
 
 
 def render_bar(value: int, total: int, width: int = 20) -> str:
@@ -33,23 +33,6 @@ def render_bar(value: int, total: int, width: int = 20) -> str:
     pct = value / total * 100
     color = C.ERR if pct > 85 else (C.WARN if pct > 60 else C.GREEN)
     return f"{color}[{bar}]{C.RESET} {pct:.1f}%"
-
-
-def parse_bytes(s: str) -> int:
-    """Convierte '64.0MiB', '256KiB', '1GiB' a bytes."""
-    s = s.strip()
-    units = {"KiB": 1024, "MiB": 1024**2, "GiB": 1024**3,
-             "KB": 1000, "MB": 1000**2, "GB": 1000**3, "B": 1}
-    for unit, mult in units.items():
-        if s.endswith(unit):
-            try:
-                return int(float(s[:-len(unit)]) * mult)
-            except ValueError:
-                return 0
-    try:
-        return int(s)
-    except ValueError:
-        return 0
 
 
 def show_info(api):
@@ -84,11 +67,6 @@ def show_info(api):
     ifaces_total = len(interfaces)
     devices_conn = sum(1 for l in leases if l.get("status") == "bound")
 
-    def fmt_mem(b):
-        if b >= 1024**2: return f"{b/1024**2:.1f} MB"
-        if b >= 1024:    return f"{b/1024:.1f} KB"
-        return f"{b} B"
-
     sep = "─" * 60
     print(f"\n{C.BOLD}{sep}{C.RESET}")
     print(f"  {C.HEADER}🌐  {name}  ─  {board}  ─  RouterOS {version}{C.RESET}")
@@ -100,9 +78,9 @@ def show_info(api):
 
     print(f"  {C.BOLD}CPU:         {C.RESET}  {render_bar(cpu_load, 100)}  ({cpu_load}%)")
     print(f"  {C.BOLD}RAM:         {C.RESET}  {render_bar(used_mem, total_mem)}"
-          f"  {fmt_mem(used_mem)} / {fmt_mem(total_mem)}")
+          f"  {fmt_bytes(used_mem)} / {fmt_bytes(total_mem)}")
     print(f"  {C.BOLD}Disco:       {C.RESET}  {render_bar(used_hdd, total_hdd)}"
-          f"  {fmt_mem(used_hdd)} / {fmt_mem(total_hdd)}")
+          f"  {fmt_bytes(used_hdd)} / {fmt_bytes(total_hdd)}")
 
     print(f"\n  {C.BOLD}Interfaces:  {C.RESET}  {C.GREEN}{ifaces_up} activas{C.RESET}"
           f" de {ifaces_total} totales")
@@ -136,4 +114,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_script(main)
