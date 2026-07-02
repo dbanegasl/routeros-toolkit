@@ -46,7 +46,7 @@ from datetime import date, datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from lib import (MikroTikAPI, load_config, build_device_map,
                  get_mac_vendor_cache, C, load_json_config, save_json_config,
-                 run_script)
+                 parse_router_date, get_router_datetime, run_script)
 
 # Tags para identificar nuestras reglas
 DROP_TAG  = "HORARIO-INTERNET"       # la regla DROP global
@@ -150,25 +150,6 @@ def parse_drop_time(rule: dict) -> tuple[str, str, list]:
 # ¿El corte está aplicándose AHORA? (según el reloj del router)
 # ---------------------------------------------------------------------------
 
-_MESES_ROS = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-              "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
-
-
-def parse_router_date(d: str) -> date | None:
-    """Convierte la fecha del router a date: 'jul/02/2026' (v6) o '2026-07-02' (v7)."""
-    d = d.strip().lower()
-    try:
-        if "/" in d:
-            mes, dia, anio = d.split("/")
-            return date(int(anio), _MESES_ROS[mes], int(dia))
-        if "-" in d:
-            anio, mes, dia = d.split("-")
-            return date(int(anio), int(mes), int(dia))
-    except (ValueError, KeyError):
-        pass
-    return None
-
-
 def _a_minutos(hhmm: str) -> int:
     h, m = hhmm.split(":")[:2]
     return int(h) * 60 + int(m)
@@ -205,20 +186,12 @@ def get_router_now(api) -> tuple[int, str, str] | None:
 
     Retorna None si no se puede interpretar (se puede caer al reloj local).
     """
-    try:
-        clock = api.command("/system/clock/print")[0]
-    except (IndexError, RuntimeError):
+    ahora = get_router_datetime(api)
+    if ahora is None:
         return None
-    t = clock.get("time", "")
-    fecha = parse_router_date(clock.get("date", ""))
-    partes = t.split(":")
-    if fecha is None or len(partes) < 2:
-        return None
-    try:
-        h, m = int(partes[0]), int(partes[1])
-    except ValueError:
-        return None
-    return h * 60 + m, ALL_DAYS[fecha.weekday()], f"{h:02d}:{m:02d}"
+    return (ahora.hour * 60 + ahora.minute,
+            ALL_DAYS[ahora.weekday()],
+            f"{ahora.hour:02d}:{ahora.minute:02d}")
 
 
 def remove_all_rules(api) -> int:

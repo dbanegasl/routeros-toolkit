@@ -51,12 +51,18 @@ class TestIntegridadMenu(unittest.TestCase):
                 self.assertNotIn(key, menu.CONFIRMAR)
 
     def test_mutadores_inmediatos_requieren_confirmacion(self):
-        # 10 (deploy) y 13 (reset) escriben en el router sin volver a preguntar
+        # Opciones que escriben en el router sin volver a preguntar:
+        # 10 (deploy), 13 (reset) y 09 --remove (eliminar corte)
         lookup = menu.build_lookup()
         for key, (script, args) in lookup.items():
-            if script in ("10_deploy_qos.py", "13_reset_qos.py") and "--dry-run" not in args:
+            inmediato = (
+                (script in ("10_deploy_qos.py", "13_reset_qos.py")
+                 and "--dry-run" not in args)
+                or (script == "09_schedule_internet.py" and "--remove" in args)
+            )
+            if inmediato:
                 self.assertIn(key, menu.CONFIRMAR,
-                              f"Opción [{key}] ({script}) escribe en el router y no pide confirmación")
+                              f"Opción [{key}] ({script} {args}) escribe en el router y no pide confirmación")
 
 
 if __name__ == "__main__":

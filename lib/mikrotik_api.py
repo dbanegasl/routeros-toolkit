@@ -41,6 +41,7 @@ import socket
 import hashlib
 import json
 import os
+from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
@@ -659,6 +660,48 @@ def build_device_map(api, by: str = "ip") -> dict:
 def build_name_map(api) -> dict:
     """Mapa simple IP → nombre descriptivo (ver build_device_map)."""
     return {ip: d["name"] for ip, d in build_device_map(api).items()}
+
+
+# ---------------------------------------------------------------------------
+# Reloj del router (/system/clock)
+# ---------------------------------------------------------------------------
+
+_MESES_ROS = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+              "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
+
+
+def parse_router_date(d: str) -> Optional[date]:
+    """Convierte la fecha del router a date: 'jul/02/2026' (v6) o '2026-07-02' (v7)."""
+    d = d.strip().lower()
+    try:
+        if "/" in d:
+            mes, dia, anio = d.split("/")
+            return date(int(anio), _MESES_ROS[mes], int(dia))
+        if "-" in d:
+            anio, mes, dia = d.split("-")
+            return date(int(anio), int(mes), int(dia))
+    except (ValueError, KeyError):
+        pass
+    return None
+
+
+def get_router_datetime(api) -> Optional[datetime]:
+    """Fecha y hora actuales según el reloj del router, o None si no se
+    pueden interpretar (el llamador puede caer al reloj local)."""
+    try:
+        clock = api.command("/system/clock/print")[0]
+    except (IndexError, RuntimeError):
+        return None
+    fecha = parse_router_date(clock.get("date", ""))
+    partes = clock.get("time", "").split(":")
+    if fecha is None or len(partes) < 2:
+        return None
+    try:
+        h, m = int(partes[0]), int(partes[1])
+        s = int(partes[2]) if len(partes) > 2 else 0
+    except ValueError:
+        return None
+    return datetime(fecha.year, fecha.month, fecha.day, h, m, s)
 
 
 # ---------------------------------------------------------------------------
