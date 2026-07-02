@@ -10,59 +10,28 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from lib import MikroTikAPI, load_config, print_header, run_script
+from core.qos import agrupar_por_prioridad
 
 
 def main():
     print_header("🔍 Diagnóstico QoS — Verificar marcado de tráfico")
-    
+
     config = load_config()
     print(f"Conectando a {config['host']}...")
-    
+
     with MikroTikAPI(**config) as api:
         print("✓ Conectado\n")
-        
+
         # ============================================================
         # 1. VER CONTADORES DE REGLAS MANGLE
         # ============================================================
         print_header("1️⃣  CONTADORES DE REGLAS MANGLE")
-        
+
         mangle = api.command('/ip/firewall/mangle/print')
         print(f"Total de reglas: {len(mangle)}\n")
-        
-        # Agrupar por marca
-        marks = {}
-        for rule in mangle:
-            comment = rule.get('comment', 'unknown')
-            bytes_val = int(rule.get('bytes', 0))
-            packets_val = int(rule.get('packets', 0))
-            
-            # Extraer marca de prioridad (P1, P2, etc)
-            priority = "unknown"
-            if "P1" in comment:
-                priority = "P1_Critico"
-            elif "P2" in comment:
-                priority = "P2_Kevin"
-            elif "P3" in comment:
-                priority = "P3_Trabajo"
-            elif "P5" in comment:
-                priority = "P5_Streaming"
-            elif "P6" in comment:
-                priority = "P6_Web"
-            elif "P7" in comment:
-                priority = "P7_Resto"
-            elif "P8" in comment:
-                priority = "P8_Bulk"
-            
-            if priority not in marks:
-                marks[priority] = {'bytes': 0, 'packets': 0, 'rules': []}
-            marks[priority]['bytes'] += bytes_val
-            marks[priority]['packets'] += packets_val
-            marks[priority]['rules'].append({
-                'comment': comment,
-                'bytes': bytes_val,
-                'packets': packets_val
-            })
-        
+
+        marks = agrupar_por_prioridad(mangle)
+
         # Mostrar por prioridad
         for priority in sorted(marks.keys()):
             data = marks[priority]

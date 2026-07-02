@@ -24,19 +24,11 @@ import argparse
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from lib import MikroTikAPI, load_config, build_name_map, C, run_script
-
-COMMENT_TAG = "BLOQUEADO-POR-MENU"
-
-
-def get_blocked(api) -> list:
-    """Retorna lista de reglas de bloqueo creadas por este script."""
-    rules = api.command("/ip/firewall/filter/print")
-    return [r for r in rules
-            if r.get("comment", "").startswith(COMMENT_TAG)]
+from core.bloqueos import reglas_bloqueo, bloquear_ip, desbloquear_ip
 
 
 def list_blocked(api):
-    blocked = get_blocked(api)
+    blocked = reglas_bloqueo(api)
     if not blocked:
         print(f"\n  {C.GREEN}No hay IPs bloqueadas por este script.{C.RESET}\n")
         return
@@ -50,32 +42,21 @@ def list_blocked(api):
 
 def block_ip(api, ip: str):
     # Verificar si ya está bloqueada
-    blocked = get_blocked(api)
-    for r in blocked:
+    for r in reglas_bloqueo(api):
         if r.get("src-address") == ip:
             print(f"\n  {C.WARN}⚠️  {ip} ya está bloqueada "
                   f"(ID: {r.get('.id')}){C.RESET}\n")
             return
 
-    api.command("/ip/firewall/filter/add", params=[
-        "=chain=forward",
-        f"=src-address={ip}",
-        "=action=drop",
-        f"=comment={COMMENT_TAG}-{ip}",
-        "=place-before=0",       # insertar al inicio
-    ])
+    bloquear_ip(api, ip)
     print(f"\n  {C.ERR}🔴 IP bloqueada:{C.RESET} {C.BOLD}{ip}{C.RESET}\n")
 
 
 def unblock_ip(api, ip: str):
-    blocked = get_blocked(api)
-    found = [r for r in blocked if r.get("src-address") == ip]
-    if not found:
+    removed = desbloquear_ip(api, ip)
+    if not removed:
         print(f"\n  {C.WARN}No hay regla de bloqueo para {ip}{C.RESET}\n")
         return
-    for r in found:
-        api.command("/ip/firewall/filter/remove",
-                    params=[f"=.id={r['.id']}"])
     print(f"\n  {C.GREEN}✅ Desbloqueo exitoso:{C.RESET} {C.BOLD}{ip}{C.RESET}\n")
 
 

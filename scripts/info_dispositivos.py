@@ -27,7 +27,8 @@ import os
 # Permite importar la lib desde cualquier directorio de trabajo
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from lib import MikroTikAPI, load_config, resolve_device_name, C, get_lan_prefix, run_script
+from lib import MikroTikAPI, load_config, C, run_script
+from core.dispositivos import inventario_dispositivos
 
 
 def main():
@@ -35,37 +36,7 @@ def main():
     print(f"\n{C.DIM}Conectando a {cfg['host']}:{cfg['port']}...{C.RESET}")
 
     with MikroTikAPI(**cfg) as api:
-
-        lan = get_lan_prefix(api)
-        arp_entries = api.command("/ip/arp/print")
-        arp_map = {e["address"]: e.get("mac-address", "") for e in arp_entries
-                   if e.get("address", "").startswith(lan)}
-
-        bridge_hosts = api.command("/interface/bridge/host/print")
-        mac_to_port = {h["mac-address"]: h["interface"]
-                       for h in bridge_hosts if h.get("local", "false") != "true"}
-
-        leases = api.command("/ip/dhcp-server/lease/print")
-        dhcp_ips = set()
-        rows = []
-
-        for lease in leases:
-            ip     = lease.get("address", "")
-            mac    = lease.get("mac-address", "")
-            hostname = lease.get("host-name", "")
-            status = lease.get("status", "?")
-            dhcp_ips.add(ip)
-            port   = mac_to_port.get(mac, "—")
-            name   = resolve_device_name(ip, mac, hostname, is_static=False)
-            rows.append((ip, mac, name, status, port, "DHCP"))
-
-        for ip, mac in arp_map.items():
-            if ip not in dhcp_ips:
-                port = mac_to_port.get(mac, "—")
-                name = resolve_device_name(ip, mac, "", is_static=True)
-                rows.append((ip, mac, name, "estática", port, "STATIC"))
-
-        rows.sort(key=lambda r: list(map(int, r[0].split("."))))
+        rows = inventario_dispositivos(api)
 
         sep = "─" * 100
         print(f"\n{C.BOLD}{sep}{C.RESET}")
@@ -74,7 +45,8 @@ def main():
         print(f"{C.BOLD}{sep}{C.RESET}")
 
         dhcp_count = static_count = 0
-        for ip, mac, name, status, port, tipo in rows:
+        for d in rows:
+            status = d["estado"]
             if status == "estática":
                 status_col = C.YELLOW
                 tipo_col   = C.YELLOW
@@ -88,10 +60,10 @@ def main():
                 tipo_col   = C.DIM
                 dhcp_count += 1
 
-            print(f"  {C.CYAN}{ip:<16}{C.RESET} {C.DIM}{mac:<18}{C.RESET} "
-                  f"{C.BOLD}{name:<32}{C.RESET} "
+            print(f"  {C.CYAN}{d['ip']:<16}{C.RESET} {C.DIM}{d['mac']:<18}{C.RESET} "
+                  f"{C.BOLD}{d['nombre']:<32}{C.RESET} "
                   f"{status_col}{status:<10}{C.RESET} "
-                  f"{port:<8} {tipo_col}{tipo}{C.RESET}")
+                  f"{d['puerto']:<8} {tipo_col}{d['tipo']}{C.RESET}")
 
         print(f"{C.BOLD}{sep}{C.RESET}")
         print(f"\n  Total: {C.BOLD}{len(rows)}{C.RESET} dispositivos  "

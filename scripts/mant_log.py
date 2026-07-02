@@ -23,6 +23,7 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from lib import MikroTikAPI, load_config, C, run_script
+from core.monitoreo import obtener_log, nivel_log
 
 
 LEVEL_COLOR = {
@@ -47,11 +48,7 @@ def print_log_entries(entries: list, filter_text: str = ""):
         time_str  = e.get("time", "")
         topics    = e.get("topics", "")
         message   = e.get("message", "")
-        level     = "info"
-        for lvl in ("critical", "error", "warning", "debug"):
-            if lvl in topics:
-                level = lvl
-                break
+        level     = nivel_log(topics)
 
         line = f"{time_str}  [{topics:<20}]  {message}"
         if filter_text and filter_text.lower() not in line.lower():
@@ -78,9 +75,7 @@ def main():
     with MikroTikAPI(**cfg) as api:
         try:
             while True:
-                entries = api.command("/log/print")
-                # Tomar las últimas N entradas
-                entries = entries[-args.lines:]
+                entries = obtener_log(api, args.lines)
 
                 if args.follow:
                     print("\033[H\033[J", end="")

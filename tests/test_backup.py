@@ -1,13 +1,12 @@
 """
-test_backup.py — Tests del respaldo de configuración (script 14)
-=================================================================
+test_backup.py — Tests del respaldo de configuración
+=====================================================
 
-build_snapshot / save_snapshot / snapshot_filename con una API falsa y
-un directorio temporal (MIKROTIK_BACKUP_DIR). También get_router_datetime
-de la lib. No requiere router.
+build_snapshot / save_snapshot / snapshot_filename de core/respaldo.py
+con una API falsa y un directorio temporal (MIKROTIK_BACKUP_DIR).
+También get_router_datetime de la lib. No requiere router.
 """
 
-import importlib.util
 import json
 import os
 import tempfile
@@ -16,13 +15,7 @@ from datetime import datetime
 from pathlib import Path
 
 from lib import get_router_datetime
-
-# Importar el script 14 como módulo (su nombre empieza con dígito)
-_spec = importlib.util.spec_from_file_location(
-    "backup",
-    Path(__file__).resolve().parent.parent / "scripts" / "mant_respaldo.py")
-backup = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(backup)
+from core import respaldo as backup
 
 
 class FakeAPI:

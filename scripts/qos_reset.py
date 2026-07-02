@@ -20,10 +20,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from lib import MikroTikAPI, load_config, print_header, run_script
-
-# Prefijos que identifican los elementos creados por qos_desplegar.py
-QOS_COMMENT_PREFIX = "QoS"
-QOS_QUEUE_PREFIXES = ("QoS_", "DL-", "UL-")
+from core.qos import (filtrar_mangle_qos, filtrar_colas_qos,
+                      buscar_fasttrack, rehabilitar_fasttrack)
 
 
 def main():
@@ -38,8 +36,7 @@ def main():
         # 1. Eliminar reglas Mangle del QoS (comentario 'QoS ...')
         print("[1] Eliminando reglas Mangle del QoS...")
         mangle = api.command('/ip/firewall/mangle/print')
-        qos_mangle = [m for m in mangle
-                      if m.get('comment', '').startswith(QOS_COMMENT_PREFIX)]
+        qos_mangle = filtrar_mangle_qos(mangle)
         otras = len(mangle) - len(qos_mangle)
         for m in qos_mangle:
             print(f"    - {m.get('comment', 'Sin comentario')}")
@@ -52,8 +49,7 @@ def main():
         #    primero subcolas, luego colas padre)
         print("[2] Eliminando Queue Tree del QoS...")
         trees = api.command('/queue/tree/print')
-        qos_trees = [t for t in trees
-                     if t.get('name', '').startswith(QOS_QUEUE_PREFIXES)]
+        qos_trees = filtrar_colas_qos(trees)
         otras_q = len(trees) - len(qos_trees)
         for t in reversed(qos_trees):
             print(f"    - {t.get('name', 'Sin nombre')}")
@@ -63,17 +59,11 @@ def main():
 
         # 3. Rehabilitar FastTrack (el despliegue lo deshabilita)
         print("[3] Rehabilitando FastTrack...")
-        ft = api.command('/ip/firewall/filter/print',
-                         queries=['?action=fasttrack-connection'])
-        rehabilitadas = 0
-        for rule in ft:
-            if rule.get('disabled') == 'true':
-                api.command('/ip/firewall/filter/set',
-                            params=[f"=.id={rule['.id']}", '=disabled=no'])
-                rehabilitadas += 1
+        rehabilitadas, total_ft = rehabilitar_fasttrack(api,
+                                                        solo_deshabilitadas=True)
         if rehabilitadas:
             print(f"    ✓ {rehabilitadas} regla(s) FastTrack rehabilitada(s)\n")
-        elif ft:
+        elif total_ft:
             print(f"    ℹ️  FastTrack ya estaba activo\n")
         else:
             print(f"    ℹ️  Sin reglas FastTrack\n")

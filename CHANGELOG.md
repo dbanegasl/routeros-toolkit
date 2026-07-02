@@ -5,6 +5,25 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/)
 y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### Cambiado (Fase 0 del plan de frontend — 2026-07-02)
+- **Nueva capa `core/`** (stdlib puro): la lógica de negocio de los
+  scripts se extrajo a módulos reutilizables que reciben una API
+  conectada y retornan datos, sin prints ni input:
+  `core/dispositivos.py`, `core/monitoreo.py`, `core/bloqueos.py`,
+  `core/horario.py`, `core/qos.py` y `core/respaldo.py`.
+- **`scripts/*.py` quedan como capa de presentación** (argparse, tablas
+  ANSI, confirmaciones interactivas) sobre `core/`. Comportamiento y
+  salida idénticos: verificado corriendo cada script de solo lectura
+  contra el router antes y después (solo difieren datos dinámicos como
+  contadores y hora).
+- **Tests**: los tests que cargaban scripts con `importlib` ahora
+  importan `core/` directamente (`test_qos_builders`, `test_backup`,
+  `test_schedule_status`); se agregó `tests/test_core.py` con 27 tests
+  nuevos de la lógica extraída (consumo, clasificación, bloqueos,
+  reglas de horario, filtros del reset QoS). Suite: 146 tests.
+
 ## [1.2.0] — 2026-07-02
 
 Suite QoS en el menú, estado del corte de internet claro, respaldos,

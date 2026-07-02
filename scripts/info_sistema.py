@@ -22,6 +22,7 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from lib import MikroTikAPI, load_config, fmt_bytes, C, run_script
+from core.monitoreo import resumen_sistema
 
 
 def render_bar(value: int, total: int, width: int = 20) -> str:
@@ -36,55 +37,31 @@ def render_bar(value: int, total: int, width: int = 20) -> str:
 
 
 def show_info(api):
-    # Información del sistema
-    res = api.command("/system/resource/print")
-    identity = api.command("/system/identity/print")
-    interfaces = api.command("/interface/print")
-    leases = api.command("/ip/dhcp-server/lease/print")
-
-    if not res:
+    info = resumen_sistema(api)
+    if info is None:
         print(f"{C.ERR}No se pudo obtener información del sistema.{C.RESET}")
         return
 
-    r = res[0]
-    name = identity[0].get("name", "MikroTik") if identity else "MikroTik"
-
-    uptime        = r.get("uptime", "?")
-    version       = r.get("version", "?")
-    board         = r.get("board-name", "?")
-    arch          = r.get("architecture-name", "?")
-    cpu_count     = r.get("cpu-count", "1")
-    cpu_load      = int(r.get("cpu-load", 0))
-    free_mem      = int(r.get("free-memory", 0))
-    total_mem     = int(r.get("total-memory", 1))
-    used_mem      = total_mem - free_mem
-    free_hdd      = int(r.get("free-hdd-space", 0))
-    total_hdd     = int(r.get("total-hdd-space", 1))
-    used_hdd      = total_hdd - free_hdd
-    bad_blocks    = r.get("bad-blocks", "0")
-
-    ifaces_up   = sum(1 for i in interfaces if i.get("running") == "true")
-    ifaces_total = len(interfaces)
-    devices_conn = sum(1 for l in leases if l.get("status") == "bound")
-
     sep = "─" * 60
     print(f"\n{C.BOLD}{sep}{C.RESET}")
-    print(f"  {C.HEADER}🌐  {name}  ─  {board}  ─  RouterOS {version}{C.RESET}")
+    print(f"  {C.HEADER}🌐  {info['name']}  ─  {info['board']}  ─  "
+          f"RouterOS {info['version']}{C.RESET}")
     print(f"{C.BOLD}{sep}{C.RESET}\n")
 
-    print(f"  {C.BOLD}Arquitectura:{C.RESET}  {arch}  ({cpu_count} CPU)")
-    print(f"  {C.BOLD}Uptime:      {C.RESET}  {uptime}")
-    print(f"  {C.BOLD}Versión:     {C.RESET}  RouterOS {version}\n")
+    print(f"  {C.BOLD}Arquitectura:{C.RESET}  {info['arch']}  ({info['cpu_count']} CPU)")
+    print(f"  {C.BOLD}Uptime:      {C.RESET}  {info['uptime']}")
+    print(f"  {C.BOLD}Versión:     {C.RESET}  RouterOS {info['version']}\n")
 
-    print(f"  {C.BOLD}CPU:         {C.RESET}  {render_bar(cpu_load, 100)}  ({cpu_load}%)")
-    print(f"  {C.BOLD}RAM:         {C.RESET}  {render_bar(used_mem, total_mem)}"
-          f"  {fmt_bytes(used_mem)} / {fmt_bytes(total_mem)}")
-    print(f"  {C.BOLD}Disco:       {C.RESET}  {render_bar(used_hdd, total_hdd)}"
-          f"  {fmt_bytes(used_hdd)} / {fmt_bytes(total_hdd)}")
+    print(f"  {C.BOLD}CPU:         {C.RESET}  {render_bar(info['cpu_load'], 100)}"
+          f"  ({info['cpu_load']}%)")
+    print(f"  {C.BOLD}RAM:         {C.RESET}  {render_bar(info['used_mem'], info['total_mem'])}"
+          f"  {fmt_bytes(info['used_mem'])} / {fmt_bytes(info['total_mem'])}")
+    print(f"  {C.BOLD}Disco:       {C.RESET}  {render_bar(info['used_hdd'], info['total_hdd'])}"
+          f"  {fmt_bytes(info['used_hdd'])} / {fmt_bytes(info['total_hdd'])}")
 
-    print(f"\n  {C.BOLD}Interfaces:  {C.RESET}  {C.GREEN}{ifaces_up} activas{C.RESET}"
-          f" de {ifaces_total} totales")
-    print(f"  {C.BOLD}Dispositivos:{C.RESET}  {C.CYAN}{devices_conn} conectados{C.RESET}"
+    print(f"\n  {C.BOLD}Interfaces:  {C.RESET}  {C.GREEN}{info['ifaces_up']} activas{C.RESET}"
+          f" de {info['ifaces_total']} totales")
+    print(f"  {C.BOLD}Dispositivos:{C.RESET}  {C.CYAN}{info['devices_conn']} conectados{C.RESET}"
           f" (DHCP)\n")
 
     print(f"{C.DIM}{sep}{C.RESET}\n")
