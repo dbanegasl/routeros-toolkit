@@ -5,7 +5,10 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/)
 y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
-## [Sin publicar]
+## [1.2.0] — 2026-07-02
+
+Suite QoS en el menú, estado del corte de internet claro, respaldos,
+y reorganización completa: scripts por sección y menú por décadas.
 
 ### Cambiado (reorganización 2026-07-02)
 - **Scripts renombrados por sección** (prefijo = grupo de acción; ya no
