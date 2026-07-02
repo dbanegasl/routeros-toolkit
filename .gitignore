@@ -73,3 +73,5 @@ temp/
 # ──────────────────────────────────────────
 backend/.venv/
 node_modules/
+frontend/dist/
+*.tsbuildinfo

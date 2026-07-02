@@ -7,6 +7,23 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Agregado (Fase 2 del plan de frontend — 2026-07-02)
+- **SPA React + Vite + TypeScript** (`frontend/src/`): login contra la
+  API, **Inicio** (tarjetas: estado del router con CPU/RAM/disco, corte
+  de internet con en-curso y lista blanca, QoS activo/inactivo, top 5 de
+  consumo, dispositivos conectados) y **Dispositivos** (inventario con
+  búsqueda por nombre/IP/MAC y filtros DHCP/estática). Tema oscuro,
+  responsive (barra inferior en el celular), textos centralizados en
+  `src/i18n/es.ts`, datos con TanStack Query (polling ligero, 401 →
+  vuelta al login), estilos con Tailwind CSS v4.
+- **Endpoints nuevos**: `GET /api/consumo?orden=&top=` (top consumidores
+  del connection tracking) y `GET /api/auth/sesion` (estado de sesión
+  para la SPA). Tests de backend: 24.
+- `src/lib/formato.ts` espeja `fmt_bytes`/`fmt_speed` de `lib/` y vitest
+  pinea la paridad (mismos números en CLI y panel).
+- Dockerfile del frontend ahora multi-stage: `node:22-alpine` compila la
+  SPA (`tsc -b && vite build`) y `nginx:alpine` la sirve.
+
 ### Agregado (Fase 1 del plan de frontend — 2026-07-02)
 - **Backend FastAPI** (`backend/`): API web sobre `lib/` + `core/` con
   autenticación completa — login contra `APP_PASSWORD_HASH` (PBKDF2

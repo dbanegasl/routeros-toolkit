@@ -76,6 +76,12 @@ def make_fake_api():
              "comment": "HORARIO-PERMITIDO-AA:BB:CC:11:22:33",
              "src-mac-address": "AA:BB:CC:11:22:33", "bytes": "500"},
         ],
+        "/ip/firewall/connection/print": [
+            {"src-address": "192.168.5.22:5000", "repl-rate": "1000",
+             "orig-rate": "100", "repl-bytes": "2000", "orig-bytes": "200"},
+            {"src-address": "192.168.5.7:80", "repl-rate": "50",
+             "orig-rate": "5", "repl-bytes": "10", "orig-bytes": "1"},
+        ],
         "/ip/firewall/mangle/print": [],
         "/queue/tree/print": [],
         "/queue/simple/print": [],

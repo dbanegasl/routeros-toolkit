@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 
 from lib import MikroTikConnectionError, MikroTikCommandError
 from . import auth
-from .routers import dispositivos, horario, sistema
+from .routers import dispositivos, horario, monitoreo, sistema
 
 app = FastAPI(
     title="RouterOS Toolkit — Panel web",
@@ -30,6 +30,7 @@ app.include_router(auth.router)
 app.include_router(sistema.salud_router)
 app.include_router(sistema.router)
 app.include_router(dispositivos.router)
+app.include_router(monitoreo.router)
 app.include_router(horario.router)
 
 

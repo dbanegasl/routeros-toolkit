@@ -72,6 +72,35 @@ class TestSistema:
         assert r.json()["router"]["host"]
 
 
+class TestMonitoreo:
+
+    def test_consumo(self, session):
+        r = session.get("/api/consumo")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["conexiones_totales"] == 2
+        # Ordenado por velocidad actual: Kevin primero
+        assert data["dispositivos"][0]["ip"] == "192.168.5.22"
+        assert data["dispositivos"][0]["dl_rate"] == 1000
+        assert data["dispositivos"][0]["nombre"] == "kevin-pc"
+
+    def test_consumo_orden_invalido_422(self, session):
+        r = session.get("/api/consumo", params={"orden": "malo"})
+        assert r.status_code == 422
+
+
+class TestSesion:
+
+    def test_sesion_sin_login(self, client):
+        r = client.get("/api/auth/sesion")
+        assert r.status_code == 200
+        assert r.json() == {"autenticada": False}
+
+    def test_sesion_con_login(self, session):
+        r = session.get("/api/auth/sesion")
+        assert r.json() == {"autenticada": True}
+
+
 class TestHorario:
 
     def test_estado_completo(self, session):
