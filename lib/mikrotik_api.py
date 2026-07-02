@@ -39,9 +39,25 @@ Uso rápido:
 
 import socket
 import hashlib
+import json
 import os
 from pathlib import Path
 from typing import Optional
+
+# Prefijo LAN de respaldo cuando no se puede detectar desde el router.
+LAN_PREFIX = "192.168."
+
+
+# ---------------------------------------------------------------------------
+# Excepciones tipadas (subclases de RuntimeError por compatibilidad)
+# ---------------------------------------------------------------------------
+
+class MikroTikConnectionError(RuntimeError):
+    """Fallo de conexión o autenticación con el router."""
+
+
+class MikroTikCommandError(RuntimeError):
+    """El router rechazó un comando (!trap / !fatal)."""
 
 
 # ---------------------------------------------------------------------------
@@ -92,11 +108,15 @@ def load_config(env_file: Optional[str] = None) -> dict:
         if os.environ.get(env_var):
             config[cfg_key] = os.environ[env_var]
 
+    if os.environ.get("MIKROTIK_TIMEOUT"):
+        config["MIKROTIK_TIMEOUT"] = os.environ["MIKROTIK_TIMEOUT"]
+
     return {
         "host":     config.get("MIKROTIK_HOST", "192.168.5.1"),
         "port":     int(config.get("MIKROTIK_PORT", 8728)),
         "username": config.get("MIKROTIK_USER", "admin"),
         "password": config.get("MIKROTIK_PASSWORD", ""),
+        "timeout":  float(config.get("MIKROTIK_TIMEOUT", 15)),
     }
 
 
@@ -171,10 +191,8 @@ class MikroTikAPI:
                              f"=password={self.password}"])
         resp = self._recv_sentence()
 
-        if resp and resp[0] == "!done":
-            return  # Login exitoso
-
-        # Intento 2: challenge MD5 (RouterOS < 6.43)
+        # RouterOS < 6.43 responde "!done =ret=<challenge>": la presencia
+        # del challenge exige completar el login MD5 aunque venga "!done".
         challenge = None
         for word in resp:
             if word.startswith("=ret="):
@@ -182,7 +200,9 @@ class MikroTikAPI:
                 break
 
         if challenge is None:
-            raise RuntimeError(f"Login fallido: {resp}")
+            if resp and resp[0] == "!done":
+                return  # Login moderno exitoso
+            raise MikroTikConnectionError(f"Login fallido: {resp}")
 
         md5 = hashlib.md5()
         md5.update(b"\x00")
@@ -193,7 +213,7 @@ class MikroTikAPI:
                              f"=response=00{md5.hexdigest()}"])
         resp2 = self._recv_sentence()
         if not resp2 or resp2[0] != "!done":
-            raise RuntimeError(f"Login MD5 fallido: {resp2}")
+            raise MikroTikConnectionError(f"Login MD5 fallido: {resp2}")
 
     # ------------------------------------------------------------------
     # Ejecución de comandos
@@ -243,9 +263,9 @@ class MikroTikAPI:
                 current = {}
             elif tag == "!trap":
                 error = " | ".join(words[1:])
-                raise RuntimeError(f"RouterOS error: {error}")
+                raise MikroTikCommandError(f"RouterOS error: {error}")
             elif tag == "!fatal":
-                raise RuntimeError(f"RouterOS fatal: {words}")
+                raise MikroTikCommandError(f"RouterOS fatal: {words}")
 
             for word in words[1:]:
                 if word.startswith("=") and "=" in word[1:]:
@@ -547,6 +567,194 @@ def resolve_device_name(ip: str, mac: str, hostname: str,
         label += " [estática]"
 
     return label
+
+
+# ---------------------------------------------------------------------------
+# Detección de la red LAN
+# ---------------------------------------------------------------------------
+
+def get_lan_prefix(api) -> str:
+    """
+    Detecta el prefijo de la subred LAN (ej: "192.168.5.").
+
+    Prioridad:
+        1. Variable de entorno MIKROTIK_LAN_PREFIX (override manual)
+        2. Dirección del router en /ip/address cuya interfaz sea un bridge
+        3. Primera dirección privada encontrada en /ip/address
+        4. LAN_PREFIX como último recurso ("192.168.")
+
+    El prefijo retornado siempre termina en "." y sirve para
+    str.startswith() sobre IPs de la LAN.
+    """
+    override = os.environ.get("MIKROTIK_LAN_PREFIX", "").strip()
+    if override:
+        return override if override.endswith(".") else override + "."
+
+    try:
+        addresses = api.command("/ip/address/print")
+    except Exception:
+        return LAN_PREFIX
+
+    private = ("192.168.", "10.", "172.16.", "172.17.", "172.18.",
+               "172.19.", "172.2", "172.30.", "172.31.")
+
+    candidates = []
+    for addr in addresses:
+        ip = addr.get("address", "").split("/")[0]
+        if not ip or not ip.startswith(private):
+            continue
+        prefix = ip.rsplit(".", 1)[0] + "."
+        if "bridge" in addr.get("interface", "").lower():
+            return prefix          # la LAN cuelga del bridge
+        candidates.append(prefix)
+
+    return candidates[0] if candidates else LAN_PREFIX
+
+
+# ---------------------------------------------------------------------------
+# Mapa de dispositivos de la red (DHCP + ARP)
+# ---------------------------------------------------------------------------
+
+def build_device_map(api, by: str = "ip") -> dict:
+    """
+    Construye el inventario de dispositivos combinando DHCP leases y ARP.
+    Las IPs que aparecen en ARP pero no en DHCP se marcan como estáticas.
+
+    Args:
+        api — instancia conectada de MikroTikAPI
+        by  — clave del dict resultante: "ip" (default) o "mac"
+              (MAC en mayúsculas; descarta entradas sin MAC)
+
+    Returns:
+        dict clave → {"ip", "mac", "hostname", "name", "static"}
+    """
+    devices: dict = {}
+    lan = get_lan_prefix(api)
+
+    for l in api.command("/ip/dhcp-server/lease/print"):
+        ip = l.get("address", "")
+        mac = l.get("mac-address", "")
+        hostname = l.get("host-name", "")
+        devices[ip] = {
+            "ip": ip, "mac": mac, "hostname": hostname,
+            "name": resolve_device_name(ip, mac, hostname, False),
+            "static": False,
+        }
+
+    for e in api.command("/ip/arp/print"):
+        ip = e.get("address", "")
+        mac = e.get("mac-address", "")
+        if ip.startswith(lan) and ip not in devices:
+            devices[ip] = {
+                "ip": ip, "mac": mac, "hostname": "",
+                "name": resolve_device_name(ip, mac, "", True),
+                "static": True,
+            }
+
+    if by == "mac":
+        return {d["mac"].upper(): d for d in devices.values() if d["mac"]}
+    return devices
+
+
+def build_name_map(api) -> dict:
+    """Mapa simple IP → nombre descriptivo (ver build_device_map)."""
+    return {ip: d["name"] for ip, d in build_device_map(api).items()}
+
+
+# ---------------------------------------------------------------------------
+# Caché OUI → fabricante (lib/oui_cache.json)
+# ---------------------------------------------------------------------------
+
+OUI_CACHE_FILE = Path(__file__).parent / "oui_cache.json"
+
+
+def load_oui_cache() -> dict:
+    """Lee el caché persistido de lookups a macvendors.com."""
+    if OUI_CACHE_FILE.exists():
+        try:
+            with open(OUI_CACHE_FILE) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def save_oui_cache(cache: dict):
+    """Persiste el caché de fabricantes (mejor esfuerzo, sin lanzar)."""
+    try:
+        with open(OUI_CACHE_FILE, "w") as f:
+            json.dump(cache, f, indent=2)
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Salida en terminal
+# ---------------------------------------------------------------------------
+
+def print_header(title: str, width: int = 70):
+    """Encabezado estándar de sección usado por los scripts."""
+    print(f"\n{'=' * width}")
+    print(f"  {title}")
+    print(f"{'=' * width}\n")
+
+
+# ---------------------------------------------------------------------------
+# Ejecución estándar de scripts (manejo de errores uniforme)
+# ---------------------------------------------------------------------------
+
+def run_script(main_fn):
+    """
+    Ejecuta el main() de un script con manejo de errores estándar:
+    mensajes limpios en español (nunca tracebacks) y exit codes fijos.
+
+    Exit codes:
+        0   — OK
+        1   — error de conexión o de login
+        2   — error de RouterOS (!trap) o de configuración
+        130 — cancelado con Ctrl+C
+
+    Uso (al final de cada script):
+        if __name__ == "__main__":
+            run_script(main)
+    """
+    import sys
+    from .app_config import ConfigError
+
+    def _fail(code: int, msg: str, *hints: str):
+        print(f"\n  {C.ERR}❌ {msg}{C.RESET}")
+        for hint in hints:
+            print(f"  {C.DIM}💡 {hint}{C.RESET}")
+        print()
+        sys.exit(code)
+
+    try:
+        main_fn()
+    except KeyboardInterrupt:
+        print(f"\n\n  {C.DIM}Cancelado.{C.RESET}\n")
+        sys.exit(130)
+    except MikroTikConnectionError as e:
+        _fail(1, f"No se pudo iniciar sesión: {e}",
+              "Verifica MIKROTIK_USER y MIKROTIK_PASSWORD en config.env")
+    except ConnectionRefusedError:
+        _fail(1, "El router rechazó la conexión (connection refused).",
+              "¿Está habilitada la API?  En el router: /ip service enable api",
+              "Verifica MIKROTIK_HOST y MIKROTIK_PORT en config.env")
+    except socket.timeout:
+        _fail(1, "Tiempo de espera agotado conectando al router.",
+              "¿El host de config.env es correcto y el router está encendido?",
+              "Puedes subir el límite con MIKROTIK_TIMEOUT (segundos)")
+    except ConnectionError as e:
+        _fail(1, f"La conexión con el router se interrumpió: {e}")
+    except OSError as e:
+        _fail(1, f"Error de red: {e}",
+              "¿El host de config.env es correcto y hay ruta hacia el router?")
+    except MikroTikCommandError as e:
+        _fail(2, str(e),
+              "El router rechazó la operación; revisa permisos del usuario "
+              "y los datos enviados")
+    except ConfigError as e:
+        _fail(2, str(e))
 
 
 # ---------------------------------------------------------------------------
