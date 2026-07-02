@@ -214,9 +214,11 @@ python3 scripts/09_schedule_internet.py --remove   # eliminar todas las reglas
 
 | Flag | Descripción |
 |------|-------------|
-| `--list` | Ver horario activo, excepciones y estado del archivo de whitelist |
+| `--list` | Ver el corte programado, si está **en curso ahora** (según el reloj del router), y la lista blanca con columna EN RED |
 | `--allow` | Gestionar lista blanca (persiste en `config/whitelist.json`) |
 | `--remove` | Borrar las reglas del router (la whitelist del archivo se conserva) |
+
+`--list` distingue el **corte programado** (la regla existe) del **corte en curso** (está bloqueando en este momento), maneja rangos que cruzan medianoche, y normaliza los tiempos que RouterOS v6 devuelve en formato de duración (`1h1m` → `01:01`). Los dispositivos de la lista blanca que no están conectados conservan su nombre desde `config/whitelist.json`.
 
 ---
 

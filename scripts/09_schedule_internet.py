@@ -39,8 +39,9 @@ Uso:
 
 import sys
 import os
+import re
 import argparse
-from datetime import date
+from datetime import date, datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from lib import (MikroTikAPI, load_config, build_device_map,
@@ -103,16 +104,121 @@ def get_allow_rules(api) -> list:
             if r.get("comment", "").startswith(ALLOW_TAG)]
 
 
+def normalize_ros_time(token: str) -> str:
+    """Normaliza un tiempo de RouterOS a 'HH:MM:SS'.
+
+    RouterOS v6 devuelve el campo time en formato de duración
+    ('1h1m', '6h', '45m30s'); también puede venir como '01:01:00'.
+    Si el valor no se reconoce, se retorna tal cual.
+    """
+    token = token.strip()
+    if ":" in token:
+        parts = token.split(":")
+        try:
+            h, m = int(parts[0]), int(parts[1])
+            s = int(parts[2]) if len(parts) > 2 else 0
+            return f"{h:02d}:{m:02d}:{s:02d}"
+        except ValueError:
+            return token
+    unidades = re.findall(r"(\d+)([hms])", token)
+    if not unidades:
+        return token
+    valores = {"h": 0, "m": 0, "s": 0}
+    for num, unidad in unidades:
+        valores[unidad] = int(num)
+    return f"{valores['h']:02d}:{valores['m']:02d}:{valores['s']:02d}"
+
+
 def parse_drop_time(rule: dict) -> tuple[str, str, list]:
-    """Extrae (start, end, days) del campo time de la regla DROP."""
+    """Extrae (start, end, days) del campo time de la regla DROP.
+
+    start/end quedan normalizados a 'HH:MM:SS' aunque RouterOS los
+    devuelva en formato de duración ('1h1m-6h1m,mon,tue,...').
+    """
     time_val = rule.get("time", "")
     start, end, days = "", "", list(ALL_DAYS)
     if time_val:
         parts = time_val.split(",")
         if parts and "-" in parts[0]:
             start, _, end = parts[0].partition("-")
+            start, end = normalize_ros_time(start), normalize_ros_time(end)
         days = [p for p in parts[1:] if p in DAYS_LABEL] or ALL_DAYS
     return start, end, days
+
+
+# ---------------------------------------------------------------------------
+# ¿El corte está aplicándose AHORA? (según el reloj del router)
+# ---------------------------------------------------------------------------
+
+_MESES_ROS = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+              "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
+
+
+def parse_router_date(d: str) -> date | None:
+    """Convierte la fecha del router a date: 'jul/02/2026' (v6) o '2026-07-02' (v7)."""
+    d = d.strip().lower()
+    try:
+        if "/" in d:
+            mes, dia, anio = d.split("/")
+            return date(int(anio), _MESES_ROS[mes], int(dia))
+        if "-" in d:
+            anio, mes, dia = d.split("-")
+            return date(int(anio), int(mes), int(dia))
+    except (ValueError, KeyError):
+        pass
+    return None
+
+
+def _a_minutos(hhmm: str) -> int:
+    h, m = hhmm.split(":")[:2]
+    return int(h) * 60 + int(m)
+
+
+def corte_en_curso(start: str, end: str, days: list,
+                   now_min: int, today: str) -> bool:
+    """True si el corte está bloqueando internet en este momento.
+
+    Args:
+        start/end — 'HH:MM' o 'HH:MM:SS'
+        days      — días del corte ('mon'..'sun')
+        now_min   — minuto actual del día (0–1439)
+        today     — día actual ('mon'..'sun')
+
+    Maneja rangos que cruzan medianoche (ej: 22:00 → 06:00): la madrugada
+    cuenta como continuación del día en que empezó el corte.
+    """
+    if not start or not end:
+        return False
+    ini, fin = _a_minutos(start), _a_minutos(end)
+    if ini == fin:
+        return False
+    if ini < fin:
+        return today in days and ini <= now_min < fin
+    # Cruza medianoche: [ini → 24:00) del día listado ∪ [00:00 → fin) del siguiente
+    ayer = ALL_DAYS[(ALL_DAYS.index(today) - 1) % 7]
+    return ((today in days and now_min >= ini)
+            or (ayer in days and now_min < fin))
+
+
+def get_router_now(api) -> tuple[int, str, str] | None:
+    """Lee el reloj del router: (minuto del día, día 'mon'..'sun', 'HH:MM').
+
+    Retorna None si no se puede interpretar (se puede caer al reloj local).
+    """
+    try:
+        clock = api.command("/system/clock/print")[0]
+    except (IndexError, RuntimeError):
+        return None
+    t = clock.get("time", "")
+    fecha = parse_router_date(clock.get("date", ""))
+    partes = t.split(":")
+    if fecha is None or len(partes) < 2:
+        return None
+    try:
+        h, m = int(partes[0]), int(partes[1])
+    except ValueError:
+        return None
+    return h * 60 + m, ALL_DAYS[fecha.weekday()], f"{h:02d}:{m:02d}"
 
 
 def remove_all_rules(api) -> int:
@@ -294,11 +400,30 @@ def list_rules(api):
     else:
         hit_str = f"{C.DIM}Sin actividad aún (0 paquetes){C.RESET}"
 
-    print(f"\n  {C.ERR}🔴 Corte activo:{C.RESET}")
+    # ¿Está bloqueando AHORA? (reloj del router; si falla, reloj local)
+    ahora = get_router_now(api)
+    fuente_reloj = "hora del router"
+    if ahora is None:
+        local = datetime.now()
+        ahora = (local.hour * 60 + local.minute,
+                 ALL_DAYS[local.weekday()],
+                 f"{local.hour:02d}:{local.minute:02d}")
+        fuente_reloj = "hora de este PC"
+    now_min, today, hhmm = ahora
+    en_curso = corte_en_curso(start, end, days, now_min, today)
+
+    print(f"\n  {C.BOLD}⏰ Corte programado:{C.RESET}")
     print(f"     Interfaz WAN    : {C.CYAN}{drop.get('out-interface','?')}{C.RESET}")
     print(f"     Sin internet    : {C.ERR}{start[:5]}{C.RESET} → {C.ERR}{end[:5]}{C.RESET}")
     print(f"     Días            : {days_labels}")
     print(f"     Afecta a        : {C.BOLD}TODOS{C.RESET} los no listados abajo")
+    if en_curso:
+        print(f"     Ahora mismo     : {C.ERR}⛔ EN CURSO — bloqueando internet "
+              f"(hasta las {end[:5]}){C.RESET}")
+    else:
+        print(f"     Ahora mismo     : {C.GREEN}🟢 Fuera de horario — "
+              f"internet normal{C.RESET}")
+    print(f"                       {C.DIM}({fuente_reloj}: {hhmm}){C.RESET}")
     print(f"     Tráfico cortado : {hit_str}")
 
     if allows:
@@ -307,16 +432,25 @@ def list_rules(api):
         allow_map = {r.get("src-mac-address", "").upper(): r for r in allows}
         print(f"\n  {C.GREEN}✅ Lista blanca — siempre con internet "
               f"({len(allowed_macs)} dispositivo(s)):{C.RESET}")
-        print(f"  {'MAC':<22} {'IP':<16} {'TRÁFICO':<14} NOMBRE")
-        print(f"  {'─'*72}")
+        print(f"     {'MAC':<19} {'IP':<16} {'TRÁFICO':<9} {'EN RED':<7} NOMBRE")
+        print(f"  {'─'*76}")
         for mac in sorted(allowed_macs):
-            dev   = devices.get(mac, {})
-            ip    = dev.get("ip", "—")
-            name  = dev.get("name", f"{C.DIM}(no en red ahora){C.RESET}")
-            rule  = allow_map.get(mac, {})
-            traf  = _fmt_counter(rule.get("bytes", "0"))
-            traf_str = f"{C.GREEN}{traf}B{C.RESET}" if rule.get("bytes","0") != "0" else f"{C.DIM}—{C.RESET}"
-            print(f"  {C.GREEN}✓{C.RESET}  {mac:<20} {ip:<16} {traf_str:<14} {name}")
+            dev    = devices.get(mac)
+            en_red = dev is not None
+            ip     = dev["ip"] if en_red else "—"
+            # Nombre: el de la red si está conectado; si no, el guardado
+            # en config/whitelist.json (no se pierde por estar offline)
+            name = ((dev.get("name") if en_red else None)
+                    or stored.get(mac, {}).get("nombre")
+                    or "—")
+            rule = allow_map.get(mac, {})
+            traf = (f"{_fmt_counter(rule['bytes'])}B"
+                    if rule.get("bytes", "0") != "0" else "—")
+            traf_c = C.GREEN if traf != "—" else C.DIM
+            red    = "sí" if en_red else "no"
+            red_c  = C.GREEN if en_red else C.DIM
+            print(f"  {C.GREEN}✓{C.RESET}  {mac:<19} {ip:<16} "
+                  f"{traf_c}{traf:<9}{C.RESET} {red_c}{red:<7}{C.RESET} {name}")
     else:
         print(f"\n  {C.WARN}⚠️  Lista blanca vacía — el corte aplica a "
               f"TODOS los dispositivos.{C.RESET}")
