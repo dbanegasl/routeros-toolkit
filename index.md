@@ -39,7 +39,7 @@ Opcionales: `MIKROTIK_TIMEOUT` (segundos de espera, default 15) y `MIKROTIK_LAN_
 python3 menu.py
 ```
 
-El **menú principal** tiene 7 categorías y 27 opciones. Selecciona con números y Enter. `Ctrl+C` en cualquier script devuelve al menú. Las opciones que modifican el router de forma inmediata (desplegar QoS [23] y eliminar QoS [26]) piden confirmación explícita antes de ejecutarse.
+El **menú principal** tiene 7 categorías y 29 opciones. Selecciona con números y Enter. `Ctrl+C` en cualquier script devuelve al menú. Las opciones que modifican el router de forma inmediata (eliminar corte [21], desplegar QoS [23] y eliminar QoS [26]) piden confirmación explícita antes de ejecutarse.
 
 Todos los scripts funcionan también standalone desde la raíz del proyecto.
 
@@ -219,6 +219,26 @@ python3 scripts/09_schedule_internet.py --remove   # eliminar todas las reglas
 | `--remove` | Borrar las reglas del router (la whitelist del archivo se conserva) |
 
 `--list` distingue el **corte programado** (la regla existe) del **corte en curso** (está bloqueando en este momento), maneja rangos que cruzan medianoche, y normaliza los tiempos que RouterOS v6 devuelve en formato de duración (`1h1m` → `01:01`). Los dispositivos de la lista blanca que no están conectados conservan su nombre desde `config/whitelist.json`.
+
+---
+
+### `14_backup.py` — Respaldo de configuración
+
+Snapshot local en JSON (en `backups/`, gitignored) de todas las secciones que el toolkit puede modificar: firewall filter/mangle/nat, colas, leases DHCP, schedulers y direcciones IP, con metadatos del router. El modo por defecto y `--list` son de **solo lectura**. Úsalo antes de desplegar QoS o tocar firewall.
+
+```bash
+python3 scripts/14_backup.py             # snapshot local (solo lectura)
+python3 scripts/14_backup.py --full      # + .backup completo EN el router
+python3 scripts/14_backup.py --list      # ver respaldos locales y del router
+```
+
+| Flag | Descripción |
+|------|-------------|
+| *(sin flags)* | Snapshot JSON local de las secciones mutables |
+| `--full` | Además ejecuta `/system/backup/save` — el `.backup` restaurable queda en el router (Files en Winbox) |
+| `--list` | Lista snapshots locales y archivos `.backup` del router |
+
+El directorio local es `backups/` (override: `MIKROTIK_BACKUP_DIR`).
 
 ---
 

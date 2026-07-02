@@ -22,6 +22,7 @@ Herramientas de diagnóstico y administración para routers **MikroTik RouterOS*
 | 🚦 QoS           | `11_diagnose_qos.py`          | Diagnostica si las reglas Mangle están marcando    |
 | 🚦 QoS           | `12_monitor_qos.py`           | Monitor de tráfico por categoría en tiempo real    |
 | 🚦 QoS           | `13_reset_qos.py`             | Elimina solo los elementos QoS (preserva otras reglas) |
+| 💾 Respaldo      | `14_backup.py`                | Snapshot local de la config + `.backup` completo (`--full`) |
 
 ---
 
@@ -59,7 +60,7 @@ Las variables de entorno del sistema (`MIKROTIK_HOST`, `MIKROTIK_PORT`, `MIKROTI
 ### 3. Ejecutar
 
 ```bash
-python3 menu.py                          # menú interactivo (27 opciones)
+python3 menu.py                          # menú interactivo (29 opciones)
 python3 scripts/01_list_devices.py       # o cualquier script standalone
 ```
 
@@ -93,9 +94,11 @@ routeros-toolkit/
 │   ├── 00_validate_router.py  # Verificación previa
 │   ├── 01–09_*.py             # Herramientas de info, monitoreo y control
 │   ├── 10–13_*.py             # Suite QoS (deploy / diagnose / monitor / reset)
+│   ├── 14_backup.py           # Respaldo de configuración (snapshot + .backup)
 │   ├── README_QOS.md          # Guía de la suite QoS
 │   ├── 10_USAGE.md            # Manual detallado del despliegue QoS
 │   └── 10_QUICK_REFERENCE.md  # Referencia rápida QoS
+├── backups/                   # Snapshots del router (en .gitignore)
 ├── tests/                     # Suite de tests (unittest, sin router)
 ├── index.md                   # Referencia técnica: protocolo API + todos los scripts
 └── CLAUDE.md                  # Guía para asistentes de código (Claude Code)

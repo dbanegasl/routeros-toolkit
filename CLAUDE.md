@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Python toolkit for administering a MikroTik RouterOS router (hEX lite, RouterOS v6.49.19) over its native binary API on port 8728. **No external dependencies** — Python 3.6+ standard library only (including the tests, which use `unittest`). There is no build step or linter. Code, comments, and all user-facing output are in **Spanish**; keep new code consistent with that.
 
-**Scripts talk to a live production router.** Anything beyond `print` commands (firewall rules, mangle, queues, schedulers, DHCP leases) mutates real router state. Read-only scripts (01–05, 07, 08, 00, 11, 12) are safe to run; be deliberate with 06, 09, 10, and 13.
+**Scripts talk to a live production router.** Anything beyond `print` commands (firewall rules, mangle, queues, schedulers, DHCP leases) mutates real router state. Read-only scripts (01–05, 07, 08, 00, 11, 12, and 14 without `--full`) are safe to run; be deliberate with 06, 09, 10, and 13. `14_backup.py` writes local JSON snapshots to `backups/` (gitignored); `--full` additionally creates a `.backup` file on the router.
 
 ## Running
 
@@ -25,7 +25,7 @@ Credentials come from `config.env` (gitignored; template in `config.env.example`
 
 - **`lib/mikrotik_api.py`** — everything shared:
   - `MikroTikAPI`: from-scratch implementation of the RouterOS binary protocol (length-prefixed words, sentences, `!re`/`!done`/`!trap` responses, modern + MD5-challenge login). `command()` returns a list of dicts; `command_raw()` returns raw sentences for config-style commands. Use as a context manager.
-  - Helpers: `fmt_speed`/`fmt_bytes`, `is_random_mac` (private MAC detection), `get_mac_vendor_cache` (offline OUI→vendor table), `lookup_mac_vendor_online` (macvendors.com, ~1 req/s rate limit), `resolve_device_name` (hostname → vendor+MAC → MAC fallback), `build_device_map`/`build_name_map` (DHCP+ARP inventory, keyed by IP or MAC), `load_oui_cache`/`save_oui_cache`, `print_header`, `LAN_PREFIX`, and `C` (ANSI colors). Scripts must use these instead of reimplementing them.
+  - Helpers: `fmt_speed`/`fmt_bytes`, `is_random_mac` (private MAC detection), `get_mac_vendor_cache` (offline OUI→vendor table), `lookup_mac_vendor_online` (macvendors.com, ~1 req/s rate limit), `resolve_device_name` (hostname → vendor+MAC → MAC fallback), `build_device_map`/`build_name_map` (DHCP+ARP inventory, keyed by IP or MAC), `load_oui_cache`/`save_oui_cache`, `print_header`, `parse_router_date`/`get_router_datetime` (router clock, handles v6 `jul/02/2026` and v7 date formats), `LAN_PREFIX`, and `C` (ANSI colors). Scripts must use these instead of reimplementing them.
   - Tests live in `tests/` (unittest, stdlib only, no router needed): `python3 -m unittest discover -s tests -v`.
 - **`lib/app_config.py`** — JSON config files in `config/` (overridable via `MIKROTIK_CONFIG_DIR`, used by tests): `load_json_config`/`save_json_config` with shallow default-merge and clean `ConfigError` on corrupt JSON. Real files are gitignored; `.example` templates are committed. Current files: `config/qos.json` (QoS deploy settings) and `config/whitelist.json` (persistent internet-schedule whitelist).
   - All values from `command()` are **strings** (RouterOS returns text); cast to `int()` for byte counters etc.

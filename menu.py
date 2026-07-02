@@ -79,6 +79,12 @@ MENU = {
             ("11", "Ver dispositivos bloqueados",
              "06_block_ip.py", "--list",
              "Lista todos los dispositivos bloqueados por este gestor"),
+            ("28", "Respaldar configuración",
+             "14_backup.py", "",
+             "Snapshot local de firewall/colas/leases — solo lectura"),
+            ("29", "Ver respaldos existentes",
+             "14_backup.py", "--list",
+             "Lista snapshots locales y archivos .backup del router"),
         ],
     },
     "scan": {
@@ -154,6 +160,8 @@ MENU = {
 # Opciones que modifican el router de forma inmediata al lanzarse (el script
 # no vuelve a preguntar): el menú exige confirmación explícita antes.
 CONFIRMAR = {
+    "21": ("Esto eliminará el corte programado y sus reglas del router "
+           "(la lista blanca queda guardada en config/whitelist.json)."),
     "23": "Esto desplegará el plan QoS completo (Mangle + Queue Tree) y deshabilitará FastTrack.",
     "26": "Esto eliminará todas las reglas y colas QoS del router y rehabilitará FastTrack.",
 }

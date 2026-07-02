@@ -11,7 +11,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from lib import MikroTikAPI, load_config, print_header, fmt_bytes, load_json_config, run_script
+from datetime import datetime
+
+from lib import (MikroTikAPI, load_config, print_header, fmt_bytes,
+                 load_json_config, get_router_datetime, run_script)
 
 
 def main():
@@ -121,7 +124,37 @@ def main():
                 tx = int(iface.get('tx-byte', 0))
                 print(f"  {name:15} RX: {fmt_bytes(rx):>10}  TX: {fmt_bytes(tx):>10}")
         
-        # 8. RESUMEN
+        # 8. RELOJ Y NTP — el corte por horario (09) y las reglas time=
+        # dependen de que la hora del router sea correcta
+        print("\n[8] Reloj del router y NTP")
+        print("-" * 70)
+        reloj_router = get_router_datetime(api)
+        if reloj_router is None:
+            print("  ⚠️  No se pudo leer el reloj del router")
+        else:
+            deriva = abs((reloj_router - datetime.now()).total_seconds())
+            print(f"  • Hora del router: {reloj_router:%Y-%m-%d %H:%M:%S}")
+            print(f"  • Hora de este PC: {datetime.now():%Y-%m-%d %H:%M:%S}")
+            if deriva <= 120:
+                print(f"  ✓ Sincronizado (diferencia: {deriva:.0f}s)")
+            else:
+                print(f"  ❌ Deriva de {deriva/60:.1f} minutos — los cortes por "
+                      f"horario NO ocurrirán a la hora esperada")
+        try:
+            ntp = api.command('/system/ntp/client/print')
+            ntp_on = bool(ntp) and ntp[0].get('enabled') == 'true'
+            if ntp_on:
+                print(f"  ✓ Cliente NTP habilitado")
+            else:
+                print(f"  ⚠️  Cliente NTP deshabilitado — la hora se perderá "
+                      f"al reiniciar el router")
+                print(f"     Actívalo en Winbox: System → NTP Client")
+        except RuntimeError:
+            # Informativo, mejor esfuerzo: en algunas versiones el paquete
+            # NTP no está instalado y el comando no existe
+            print(f"  ℹ️  No se pudo consultar el cliente NTP")
+
+        # 9. RESUMEN
         print("\n" + "=" * 70)
         print("  ✅ ROUTER VALIDADO")
         print("=" * 70)

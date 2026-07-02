@@ -7,7 +7,22 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Añadido (arreglos rápidos 2026-07-02)
+- **`14_backup.py`** — respaldo de configuración: snapshot JSON local de las
+  secciones que el toolkit puede modificar (firewall, mangle, nat, colas,
+  leases, schedulers) en `backups/` (gitignored); `--full` crea además un
+  `.backup` completo restaurable en el router; `--list` muestra ambos.
+  En el menú: opciones [28] y [29].
+- **Chequeo de reloj y NTP en `00_validate_router.py`**: compara la hora del
+  router contra la del PC (avisa si la deriva supera 2 minutos — los cortes
+  por horario dependen de ella) y verifica que el cliente NTP esté activo.
+- Helpers de reloj en la lib: `parse_router_date` / `get_router_datetime`
+  (formatos de fecha v6 y v7), ahora compartidos por los scripts 00 y 09.
+
 ### Corregido
+- **La opción [21] del menú (eliminar corte programado) ejecutaba
+  `09 --remove` sin pedir confirmación** — ahora exige confirmación explícita
+  como las demás opciones que modifican el router de inmediato.
 - **Vista de estado del corte de internet (`09 --list`)**:
   - Los horarios que RouterOS v6 devuelve en formato de duración se
     normalizan (mostraba "1h1m → 6h1m" en vez de "01:01 → 06:01").
