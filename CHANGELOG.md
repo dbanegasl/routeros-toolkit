@@ -7,6 +7,19 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Corregido
+- **Vista de estado del corte de internet (`09 --list`)**:
+  - Los horarios que RouterOS v6 devuelve en formato de duración se
+    normalizan (mostraba "1h1m → 6h1m" en vez de "01:01 → 06:01").
+  - La cabecera distingue **corte programado** de **corte en curso**: una
+    línea "Ahora mismo" indica si está bloqueando en este momento según el
+    reloj del router (maneja rangos que cruzan medianoche; si el reloj del
+    router no se puede leer, usa el de este PC y lo indica).
+  - La lista blanca tiene columna **EN RED** (sí/no) y los dispositivos
+    desconectados conservan su nombre desde `config/whitelist.json`
+    (antes se mostraba "(no en red ahora)" perdiendo el nombre).
+  - `tests/test_schedule_status.py`: 17 tests de la lógica (110 en total).
+
 ### Añadido
 - **Suite QoS en el menú interactivo**: nueva sección "🚦 CALIDAD DE SERVICIO"
   con dry-run [22], desplegar [23], diagnosticar [24], monitor [25] y
