@@ -1,5 +1,10 @@
 # QoS Scripts — MikroTik RouterOS v6.49.19
 
+> 💡 Toda la suite está disponible también desde el **menú interactivo**
+> (`python3 menu.py`, sección "🚦 CALIDAD DE SERVICIO"): dry-run [22],
+> desplegar [23], diagnosticar [24], monitor [25] y reset [26]. Las
+> opciones que modifican el router (23 y 26) piden confirmación.
+
 ## 📋 Scripts disponibles
 
 ### 1. **10_deploy_qos.py** — DESPLEGAR QoS

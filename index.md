@@ -39,7 +39,7 @@ Opcionales: `MIKROTIK_TIMEOUT` (segundos de espera, default 15) y `MIKROTIK_LAN_
 python3 menu.py
 ```
 
-El **menú principal** tiene 6 categorías y 21 opciones. Selecciona con números y Enter. `Ctrl+C` en cualquier script devuelve al menú.
+El **menú principal** tiene 7 categorías y 27 opciones. Selecciona con números y Enter. `Ctrl+C` en cualquier script devuelve al menú. Las opciones que modifican el router de forma inmediata (desplegar QoS [23] y eliminar QoS [26]) piden confirmación explícita antes de ejecutarse.
 
 Todos los scripts funcionan también standalone desde la raíz del proyecto.
 
