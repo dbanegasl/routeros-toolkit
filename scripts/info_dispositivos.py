@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-01_list_devices.py — Lista todos los dispositivos conectados a la red
+info_dispositivos.py — Lista todos los dispositivos conectados a la red
 ======================================================================
 
 Muestra:
@@ -11,10 +11,10 @@ Muestra:
 
 Uso:
     cd mikrotik/
-    python3 scripts/01_list_devices.py
+    python3 scripts/info_dispositivos.py
 
     # Filtrar por nombre:
-    python3 scripts/01_list_devices.py | grep -i samsung
+    python3 scripts/info_dispositivos.py | grep -i samsung
 
 Requiere:
     - config.env con las credenciales del router

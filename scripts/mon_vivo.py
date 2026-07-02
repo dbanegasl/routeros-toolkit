@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-03_live_monitor.py — Monitor en vivo de consumo por dispositivo
+mon_vivo.py — Monitor en vivo de consumo por dispositivo
 ===============================================================
 
 Muestra un dashboard que se refresca automáticamente cada N segundos,
@@ -14,9 +14,9 @@ Controles:
 
 Uso:
     cd mikrotik/
-    python3 scripts/03_live_monitor.py              # refresca cada 3 s
-    python3 scripts/03_live_monitor.py --interval 5  # refresca cada 5 s
-    python3 scripts/03_live_monitor.py --top 10      # mostrar top 10
+    python3 scripts/mon_vivo.py              # refresca cada 3 s
+    python3 scripts/mon_vivo.py --interval 5  # refresca cada 5 s
+    python3 scripts/mon_vivo.py --top 10      # mostrar top 10
 """
 
 import sys

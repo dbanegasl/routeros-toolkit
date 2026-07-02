@@ -2,7 +2,7 @@
 test_schedule_status.py — Tests del estado del corte de internet (script 09)
 =============================================================================
 
-Funciones puras de 09_schedule_internet.py:
+Funciones puras de horario_internet.py:
 - normalize_ros_time: RouterOS v6 devuelve tiempos en formato de duración
   ('1h1m'), hay que normalizarlos a HH:MM:SS
 - parse_drop_time: extracción de horario y días de la regla DROP
@@ -21,7 +21,7 @@ from pathlib import Path
 # Importar el script 09 como módulo (su nombre empieza con dígito)
 _spec = importlib.util.spec_from_file_location(
     "schedule_internet",
-    Path(__file__).resolve().parent.parent / "scripts" / "09_schedule_internet.py")
+    Path(__file__).resolve().parent.parent / "scripts" / "horario_internet.py")
 schedule = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(schedule)
 

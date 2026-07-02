@@ -1,8 +1,8 @@
-# 📜 Instrucciones de Uso — Script 10_deploy_qos.py
+# 📜 Instrucciones de Uso — Script qos_desplegar.py
 
 ## 🎯 Descripción
 
-El script `10_deploy_qos.py` implementa automáticamente todas las reglas del plan QoS definido en `QoS_MikroTik_Kevin_KUTOGG_v2.md`.
+El script `qos_desplegar.py` implementa automáticamente todas las reglas del plan QoS definido en `QoS_MikroTik_Kevin_KUTOGG_v2.md`.
 
 **Qué hace:**
 1. ✓ Verifica interfaces, FastTrack e IPs
@@ -45,7 +45,7 @@ MIKROTIK_PASSWORD=tu_contraseña
 ### Ejecutar el despliegue
 
 ```bash
-python3 scripts/10_deploy_qos.py
+python3 scripts/qos_desplegar.py
 ```
 
 El script mostrará un resumen de cada paso:
@@ -111,19 +111,19 @@ Conectando a 192.168.1.1:8728...
 
 ### Despliegue normal
 ```bash
-python3 scripts/10_deploy_qos.py
+python3 scripts/qos_desplegar.py
 ```
 
 ### Dry-run (ver todo lo que haría SIN tocar el router)
 ```bash
-python3 scripts/10_deploy_qos.py --dry-run
+python3 scripts/qos_desplegar.py --dry-run
 ```
 Imprime cada regla Mangle y cada cola que se crearía. Úsalo siempre
 después de cambiar `config/qos.json` y antes de redesplegar.
 
 ### Rollback (revertir toda la configuración)
 ```bash
-python3 scripts/10_deploy_qos.py --rollback
+python3 scripts/qos_desplegar.py --rollback
 ```
 
 **Nota:** El rollback solo borra reglas Mangle y colas Queue Tree, y rehabilita FastTrack. No toca firewall.filter ni otras configuraciones.
@@ -224,7 +224,7 @@ cat config.env
 # Verificar nombres exactos de interfaz WAN y bridge LAN:
 # En Winbox → Interfaces
 # O ejecutar:
-python3 scripts/01_list_devices.py
+python3 scripts/info_dispositivos.py
 
 # En este router:
 # QoS_Download usa parent=bridge1
@@ -273,8 +273,8 @@ Editar `config/qos.json`:
 
 Verificar con `--dry-run` y redesplegar:
 ```bash
-python3 scripts/10_deploy_qos.py --dry-run
-python3 scripts/10_deploy_qos.py
+python3 scripts/qos_desplegar.py --dry-run
+python3 scripts/qos_desplegar.py
 ```
 
 ### Cambiar el dispositivo prioritario o el ancho de banda
@@ -318,13 +318,13 @@ Si algo falla:
 
 1. **Ejecutar verificación:**
    ```bash
-   python3 scripts/01_list_devices.py
-   python3 scripts/07_system_info.py
+   python3 scripts/info_dispositivos.py
+   python3 scripts/info_sistema.py
    ```
 
 2. **Revertir:**
    ```bash
-   python3 scripts/10_deploy_qos.py --rollback
+   python3 scripts/qos_desplegar.py --rollback
    ```
 
 3. **Verificar manual en Winbox:**

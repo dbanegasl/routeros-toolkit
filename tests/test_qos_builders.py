@@ -2,7 +2,7 @@
 test_qos_builders.py — Tests de las funciones puras del despliegue QoS
 =======================================================================
 
-build_mangle_rules / build_queue_tree de scripts/10_deploy_qos.py.
+build_mangle_rules / build_queue_tree de scripts/qos_desplegar.py.
 Verifica que los defaults generen EXACTAMENTE el plan original y que
 la configuración externa (IP, interfaces, escalado) se aplique bien.
 No requiere router.
@@ -17,7 +17,7 @@ from pathlib import Path
 # Importar el script 10 como módulo (su nombre empieza con dígito)
 _spec = importlib.util.spec_from_file_location(
     "deploy_qos",
-    Path(__file__).resolve().parent.parent / "scripts" / "10_deploy_qos.py")
+    Path(__file__).resolve().parent.parent / "scripts" / "qos_desplegar.py")
 deploy_qos = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(deploy_qos)
 

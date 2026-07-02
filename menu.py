@@ -30,129 +30,134 @@ from lib import MikroTikAPI, load_config, C
 # ──────────────────────────────────────────────────────────────────────────────
 # Definición del menú
 # Estructura: (key, label, script, args_hint, description)
+#
+# Numeración por décadas — el primer dígito indica la sección:
+#   1–9 Información · 10–19 Monitoreo · 20–29 Mantenimiento
+#   30–39 Identificación · 40–49 Horario · 50–59 QoS · 90–99 Sistema
+# Al agregar una opción, usar el siguiente número libre de su década.
 # ──────────────────────────────────────────────────────────────────────────────
 
 MENU = {
     "info": {
-        "title": "📊  INFORMACIÓN",
+        "title": "📊  INFORMACIÓN  [1–9]",
         "items": [
             ("1", "Inventario de dispositivos",
-             "01_list_devices.py", "",
+             "info_dispositivos.py", "",
              "Lista todos los dispositivos con IP, MAC, fabricante y puerto"),
             ("2", "Estadísticas por interfaz",
-             "04_interface_stats.py", "",
+             "info_interfaces.py", "",
              "Tráfico total y velocidad actual por interfaz física"),
-            ("3", "Estadísticas por interfaz (medir velocidad real)",
-             "04_interface_stats.py", "--watch",
+            ("3", "Medir velocidad real por interfaz",
+             "info_interfaces.py", "--watch",
              "Toma 2 muestras con 5s de intervalo y calcula velocidad"),
-            ("7", "Información del sistema",
-             "07_system_info.py", "",
+            ("4", "Información del sistema",
+             "info_sistema.py", "",
              "CPU, RAM, disco, uptime, versión de RouterOS"),
         ],
     },
     "monitor": {
-        "title": "📈  MONITOREO DE RED",
+        "title": "📈  MONITOREO DE RED  [10–19]",
         "items": [
-            ("4", "Top consumidores (snapshot)",
-             "02_top_consumers.py", "",
+            ("10", "Top consumidores (snapshot)",
+             "mon_consumo.py", "",
              "¿Quién usa más internet ahora mismo?"),
-            ("5", "Top consumidores por datos totales",
-             "02_top_consumers.py", "--sort total",
+            ("11", "Top consumidores por datos totales",
+             "mon_consumo.py", "--sort total",
              "Ordenado por GB acumulados en esta sesión"),
-            ("6", "Monitor en vivo (auto-refresh)",
-             "03_live_monitor.py", "",
+            ("12", "Monitor en vivo (auto-refresh)",
+             "mon_vivo.py", "",
              "Dashboard que se actualiza cada 3s  ─  Ctrl+C para volver"),
         ],
     },
     "maint": {
-        "title": "🔧  MANTENIMIENTO",
+        "title": "🔧  MANTENIMIENTO  [20–29]",
         "items": [
-            ("8",  "Ver log del router",
-             "05_router_log.py", "",
+            ("20", "Ver log del router",
+             "mant_log.py", "",
              "Últimas 50 entradas del syslog con colores por nivel"),
-            ("9",  "Ver log en vivo (follow)",
-             "05_router_log.py", "--follow",
+            ("21", "Ver log en vivo (follow)",
+             "mant_log.py", "--follow",
              "Log que se actualiza cada 3s  ─  Ctrl+C para volver"),
-            ("10", "Bloquear / Desbloquear dispositivo",
-             "06_block_ip.py", "",
+            ("22", "Bloquear / Desbloquear dispositivo",
+             "mant_bloqueo.py", "",
              "Agrega o quita reglas de bloqueo en el firewall por MAC"),
-            ("11", "Ver dispositivos bloqueados",
-             "06_block_ip.py", "--list",
+            ("23", "Ver dispositivos bloqueados",
+             "mant_bloqueo.py", "--list",
              "Lista todos los dispositivos bloqueados por este gestor"),
-            ("28", "Respaldar configuración",
-             "14_backup.py", "",
+            ("24", "Respaldar configuración",
+             "mant_respaldo.py", "",
              "Snapshot local de firewall/colas/leases — solo lectura"),
-            ("29", "Ver respaldos existentes",
-             "14_backup.py", "--list",
+            ("25", "Ver respaldos existentes",
+             "mant_respaldo.py", "--list",
              "Lista snapshots locales y archivos .backup del router"),
         ],
     },
     "scan": {
-        "title": "🔍  IDENTIFICACIÓN",
+        "title": "🔍  IDENTIFICACIÓN  [30–39]",
         "items": [
-            ("14", "Escanear y clasificar dispositivos",
-             "08_scan_devices.py", "",
+            ("30", "Escanear y clasificar dispositivos",
+             "scan_dispositivos.py", "",
              "Identifica fabricante y tipo de cada dispositivo en la red"),
-            ("15", "Escanear con lookup online",
-             "08_scan_devices.py", "--lookup",
+            ("31", "Escanear con lookup online",
+             "scan_dispositivos.py", "--lookup",
              "Consulta macvendors.com para MACs desconocidas (más lento)"),
-            ("16", "Buscar dispositivos Apple",
-             "08_scan_devices.py", "--filter apple",
+            ("32", "Buscar dispositivos Apple",
+             "scan_dispositivos.py", "--filter apple",
              "Muestra solo iPhones, iPads, Macs y otros Apple"),
-            ("17", "Buscar dispositivos móviles",
-             "08_scan_devices.py", "--filter mobile",
+            ("33", "Buscar dispositivos móviles",
+             "scan_dispositivos.py", "--filter mobile",
              "Muestra solo teléfonos y tablets (incluyendo MAC privada)"),
         ],
     },
     "schedule": {
-        "title": "⏰  HORARIO DE INTERNET",
+        "title": "⏰  HORARIO DE INTERNET  [40–49]",
         "items": [
-            ("18", "Programar corte de internet",
-             "09_schedule_internet.py", "",
+            ("40", "Programar corte de internet",
+             "horario_internet.py", "",
              "Bloquea TODOS en un horario — configura inicio, fin y días"),
-            ("19", "Ver estado del corte",
-             "09_schedule_internet.py", "--list",
-             "Muestra horario activo y lista blanca de excepciones"),
-            ("20", "Gestionar lista blanca (excepciones)",
-             "09_schedule_internet.py", "--allow",
+            ("41", "Ver estado del corte",
+             "horario_internet.py", "--list",
+             "Horario, si está en curso ahora, y lista blanca"),
+            ("42", "Gestionar lista blanca (excepciones)",
+             "horario_internet.py", "--allow",
              "Elige qué dispositivos siempre tienen internet (WiFi, cámaras…)"),
-            ("21", "Eliminar corte programado",
-             "09_schedule_internet.py", "--remove",
-             "Borra todas las reglas — internet libre para todos"),
+            ("43", "Eliminar corte programado",
+             "horario_internet.py", "--remove",
+             "Borra las reglas del router — pide confirmación"),
         ],
     },
     "qos": {
-        "title": "🚦  CALIDAD DE SERVICIO (QoS)",
+        "title": "🚦  CALIDAD DE SERVICIO (QoS)  [50–59]",
         "items": [
-            ("22", "Ver plan QoS (dry-run)",
-             "10_deploy_qos.py", "--dry-run",
+            ("50", "Ver plan QoS (dry-run)",
+             "qos_desplegar.py", "--dry-run",
              "Muestra cada regla y cola que se crearía — NO toca el router"),
-            ("23", "Desplegar QoS",
-             "10_deploy_qos.py", "",
+            ("51", "Desplegar QoS",
+             "qos_desplegar.py", "",
              "Aplica 23 reglas Mangle + 16 colas — pide confirmación"),
-            ("24", "Diagnosticar QoS",
-             "11_diagnose_qos.py", "",
+            ("52", "Diagnosticar QoS",
+             "qos_diagnostico.py", "",
              "Verifica si las reglas están marcando tráfico (solo lectura)"),
-            ("25", "Monitor QoS en tiempo real",
-             "12_monitor_qos.py", "",
+            ("53", "Monitor QoS en tiempo real",
+             "qos_monitor.py", "",
              "Ancho de banda por categoría  ─  Ctrl+C para volver"),
-            ("26", "Eliminar QoS (reset)",
-             "13_reset_qos.py", "",
+            ("54", "Eliminar QoS (reset)",
+             "qos_reset.py", "",
              "Borra solo los elementos QoS del router — pide confirmación"),
         ],
     },
     "system": {
-        "title": "⚙️   SISTEMA",
+        "title": "⚙️   SISTEMA  [90–99]",
         "items": [
-            ("12", "Probar conexión al router",
+            ("90", "Probar conexión al router",
              None, "",
              "Verifica que el router esté accesible y el login sea correcto"),
-            ("13", "Ver configuración actual",
+            ("91", "Ver configuración actual",
              None, "",
              "Muestra el contenido de config.env (sin la contraseña)"),
-            ("27", "Validación completa del router",
-             "00_validate_router.py", "",
-             "Chequeo previo: interfaces, IPs, FastTrack y estado QoS"),
+            ("92", "Validación completa del router",
+             "sys_validar.py", "",
+             "Chequeo previo: interfaces, IPs, FastTrack, reloj y QoS"),
         ],
     },
 }
@@ -160,10 +165,10 @@ MENU = {
 # Opciones que modifican el router de forma inmediata al lanzarse (el script
 # no vuelve a preguntar): el menú exige confirmación explícita antes.
 CONFIRMAR = {
-    "21": ("Esto eliminará el corte programado y sus reglas del router "
+    "43": ("Esto eliminará el corte programado y sus reglas del router "
            "(la lista blanca queda guardada en config/whitelist.json)."),
-    "23": "Esto desplegará el plan QoS completo (Mangle + Queue Tree) y deshabilitará FastTrack.",
-    "26": "Esto eliminará todas las reglas y colas QoS del router y rehabilitará FastTrack.",
+    "51": "Esto desplegará el plan QoS completo (Mangle + Queue Tree) y deshabilitará FastTrack.",
+    "54": "Esto eliminará todas las reglas y colas QoS del router y rehabilitará FastTrack.",
 }
 
 
@@ -289,11 +294,11 @@ def main():
             print(f"\n  {C.DIM}¡Hasta luego!{C.RESET}\n")
             break
 
-        elif opcion == "12":
+        elif opcion == "90":
             test_connection()
             pause()
 
-        elif opcion == "13":
+        elif opcion == "91":
             show_config()
             pause()
 

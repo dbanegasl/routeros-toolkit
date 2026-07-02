@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-09_schedule_internet.py — Corte de internet por horario con lista blanca
+horario_internet.py — Corte de internet por horario con lista blanca
 =========================================================================
 
 Estrategia (la más segura):
@@ -31,10 +31,10 @@ Persistencia:
 Requisito: router con hora correcta (NTP activo).
 
 Uso:
-    python3 scripts/09_schedule_internet.py              # configurar horario
-    python3 scripts/09_schedule_internet.py --list       # ver estado actual
-    python3 scripts/09_schedule_internet.py --allow      # gestionar lista blanca
-    python3 scripts/09_schedule_internet.py --remove     # eliminar todo
+    python3 scripts/horario_internet.py              # configurar horario
+    python3 scripts/horario_internet.py --list       # ver estado actual
+    python3 scripts/horario_internet.py --allow      # gestionar lista blanca
+    python3 scripts/horario_internet.py --remove     # eliminar todo
 """
 
 import sys
@@ -427,7 +427,7 @@ def list_rules(api):
     else:
         print(f"\n  {C.WARN}⚠️  Lista blanca vacía — el corte aplica a "
               f"TODOS los dispositivos.{C.RESET}")
-        print(f"  {C.DIM}Usa la opción 20 del menú para agregar excepciones.{C.RESET}")
+        print(f"  {C.DIM}Usa la opción 42 del menú para agregar excepciones.{C.RESET}")
     print()
 
 
@@ -464,7 +464,7 @@ def interactive_allow(api):
         days  = ALL_DAYS
         print(f"\n  {C.WARN}⚠️  Sin horario configurado aún.{C.RESET}")
         print(f"  {C.DIM}Puedes armar la lista blanca ahora y configurar el horario{C.RESET}")
-        print(f"  {C.DIM}después con la opción 18. Los cambios se guardan en el router.{C.RESET}")
+        print(f"  {C.DIM}después con la opción 40. Los cambios se guardan en el router.{C.RESET}")
 
     print(f"\n  {C.DIM}Los dispositivos marcados con ✓ SIEMPRE tendrán internet.{C.RESET}")
     print(f"  {C.DIM}El resto queda sin internet en el horario del corte.{C.RESET}\n")
@@ -569,7 +569,7 @@ def interactive_allow(api):
             api.command("/ip/firewall/filter/add", params=params)
         n = len(new_allowed)
         print(f"\n  {C.GREEN}✅ Lista blanca guardada ({n} dispositivo(s)).{C.RESET}")
-        print(f"  {C.WARN}Configura el horario de corte con la opción 18{C.RESET}")
+        print(f"  {C.WARN}Configura el horario de corte con la opción 40{C.RESET}")
         print(f"  {C.DIM}para que la lista blanca entre en efecto.{C.RESET}\n")
 
 
@@ -584,7 +584,7 @@ def interactive_mode(api):
     print(f"  {C.HEADER}  ⏰  Programar corte total de internet{C.RESET}")
     print(f"  {C.BOLD}{'═'*65}{C.RESET}")
     print(f"\n  {C.DIM}Bloquea TODOS los dispositivos en el horario elegido.{C.RESET}")
-    print(f"  {C.DIM}Los que agregues a la lista blanca (opción 20) siempre{C.RESET}")
+    print(f"  {C.DIM}Los que agregues a la lista blanca (opción 42) siempre{C.RESET}")
     print(f"  {C.DIM}tendrán internet. No toca bridges ni interfaces.{C.RESET}\n")
 
     if wan:
@@ -611,7 +611,7 @@ def interactive_mode(api):
         list_rules(api)
         opt = input("  ¿Reemplazar el horario? (s/n): ").strip().lower()
         if opt != "s":
-            print(f"  {C.DIM}Cancelado. Usa opción 20 para gestionar la lista blanca.{C.RESET}\n")
+            print(f"  {C.DIM}Cancelado. Usa opción 42 para gestionar la lista blanca.{C.RESET}\n")
             return
         remove_all_rules(api)
         if preserved_macs:
@@ -648,7 +648,7 @@ def interactive_mode(api):
     print(f"     Sin internet : {C.BOLD}{start[:5]}{C.RESET} → {C.BOLD}{end[:5]}{C.RESET}  "
           f"│  {days_labels}")
     if not preserved_macs:
-        print(f"\n  {C.WARN}⚠️  Lista blanca vacía — usa la opción 20 del menú{C.RESET}")
+        print(f"\n  {C.WARN}⚠️  Lista blanca vacía — usa la opción 42 del menú{C.RESET}")
         print(f"  {C.WARN}   para agregar dispositivos que siempre tendrán internet.{C.RESET}")
     else:
         print(f"     Lista blanca  : {C.GREEN}{len(preserved_macs)} dispositivo(s) "

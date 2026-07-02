@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-14_backup.py — Respaldo de la configuración del router
+mant_respaldo.py — Respaldo de la configuración del router
 ========================================================
 
 Dos niveles de respaldo:
@@ -21,9 +21,9 @@ El directorio local es backups/ en la raíz del proyecto (gitignored),
 overrideable con la variable de entorno MIKROTIK_BACKUP_DIR.
 
 Uso:
-    python3 scripts/14_backup.py             # snapshot local (solo lectura)
-    python3 scripts/14_backup.py --full      # snapshot + .backup en el router
-    python3 scripts/14_backup.py --list      # ver respaldos existentes
+    python3 scripts/mant_respaldo.py             # snapshot local (solo lectura)
+    python3 scripts/mant_respaldo.py --full      # snapshot + .backup en el router
+    python3 scripts/mant_respaldo.py --list      # ver respaldos existentes
 """
 
 import sys
@@ -112,7 +112,7 @@ def do_list(api):
 
     print(f"  {C.BOLD}Snapshots locales{C.RESET} ({backup_dir}):")
     if not locales:
-        print(f"  {C.DIM}(ninguno — crea uno con: python3 scripts/14_backup.py){C.RESET}")
+        print(f"  {C.DIM}(ninguno — crea uno con: python3 scripts/mant_respaldo.py){C.RESET}")
     for ruta in locales:
         tam = fmt_bytes(ruta.stat().st_size)
         try:
@@ -126,7 +126,7 @@ def do_list(api):
     print(f"\n  {C.BOLD}Respaldos .backup en el router{C.RESET} (Files en Winbox):")
     router_files = list_router_backups(api)
     if not router_files:
-        print(f"  {C.DIM}(ninguno — crea uno con: python3 scripts/14_backup.py --full){C.RESET}")
+        print(f"  {C.DIM}(ninguno — crea uno con: python3 scripts/mant_respaldo.py --full){C.RESET}")
     for f in router_files:
         tam = fmt_bytes(int(f.get("size", 0)))
         fecha = f.get("creation-time", "?")

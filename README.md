@@ -8,21 +8,21 @@ Herramientas de diagnóstico y administración para routers **MikroTik RouterOS*
 
 | Categoría       | Herramienta                   | Descripción                                        |
 |-----------------|-------------------------------|----------------------------------------------------|
-| ✅ Validación    | `00_validate_router.py`       | Verificación previa de conectividad y configuración|
-| 📋 Info          | `01_list_devices.py`          | Inventario de todos los dispositivos en red        |
-| 📋 Info          | `02_top_consumers.py`         | Ranking de consumo de ancho de banda por IP        |
-| 📡 Monitoreo     | `03_live_monitor.py`          | Dashboard en tiempo real (auto-refresh)            |
-| 📡 Monitoreo     | `04_interface_stats.py`       | Tráfico por interfaz física                        |
-| 🔧 Mantenimiento | `05_router_log.py`            | Visor del syslog del router (con `--follow`)       |
-| 🔧 Mantenimiento | `06_block_ip.py`              | Bloqueo/desbloqueo de IPs vía firewall             |
-| ⚙️ Sistema       | `07_system_info.py`           | CPU, RAM, uptime e información del hardware        |
-| 🔍 Identificación| `08_scan_devices.py`          | Clasifica dispositivos (Apple, móvil, IoT…) por OUI|
-| ⏰ Horarios      | `09_schedule_internet.py`     | Corte de internet programado; lista blanca persistente |
-| 🚦 QoS           | `10_deploy_qos.py`            | Despliega QoS (config en `config/qos.json`, con `--dry-run`) |
-| 🚦 QoS           | `11_diagnose_qos.py`          | Diagnostica si las reglas Mangle están marcando    |
-| 🚦 QoS           | `12_monitor_qos.py`           | Monitor de tráfico por categoría en tiempo real    |
-| 🚦 QoS           | `13_reset_qos.py`             | Elimina solo los elementos QoS (preserva otras reglas) |
-| 💾 Respaldo      | `14_backup.py`                | Snapshot local de la config + `.backup` completo (`--full`) |
+| ✅ Validación    | `sys_validar.py`       | Verificación previa de conectividad y configuración|
+| 📋 Info          | `info_dispositivos.py`          | Inventario de todos los dispositivos en red        |
+| 📋 Info          | `mon_consumo.py`         | Ranking de consumo de ancho de banda por IP        |
+| 📡 Monitoreo     | `mon_vivo.py`          | Dashboard en tiempo real (auto-refresh)            |
+| 📡 Monitoreo     | `info_interfaces.py`       | Tráfico por interfaz física                        |
+| 🔧 Mantenimiento | `mant_log.py`            | Visor del syslog del router (con `--follow`)       |
+| 🔧 Mantenimiento | `mant_bloqueo.py`              | Bloqueo/desbloqueo de IPs vía firewall             |
+| ⚙️ Sistema       | `info_sistema.py`           | CPU, RAM, uptime e información del hardware        |
+| 🔍 Identificación| `scan_dispositivos.py`          | Clasifica dispositivos (Apple, móvil, IoT…) por OUI|
+| ⏰ Horarios      | `horario_internet.py`     | Corte de internet programado; lista blanca persistente |
+| 🚦 QoS           | `qos_desplegar.py`            | Despliega QoS (config en `config/qos.json`, con `--dry-run`) |
+| 🚦 QoS           | `qos_diagnostico.py`          | Diagnostica si las reglas Mangle están marcando    |
+| 🚦 QoS           | `qos_monitor.py`           | Monitor de tráfico por categoría en tiempo real    |
+| 🚦 QoS           | `qos_reset.py`             | Elimina solo los elementos QoS (preserva otras reglas) |
+| 💾 Respaldo      | `mant_respaldo.py`                | Snapshot local de la config + `.backup` completo (`--full`) |
 
 ---
 
@@ -61,7 +61,7 @@ Las variables de entorno del sistema (`MIKROTIK_HOST`, `MIKROTIK_PORT`, `MIKROTI
 
 ```bash
 python3 menu.py                          # menú interactivo (29 opciones)
-python3 scripts/01_list_devices.py       # o cualquier script standalone
+python3 scripts/info_dispositivos.py       # o cualquier script standalone
 ```
 
 ### 4. Tests (opcional, no requiere router)
@@ -91,13 +91,15 @@ routeros-toolkit/
 │   ├── app_config.py          # Configuración JSON de la aplicación (config/)
 │   └── oui_cache.json         # Caché de fabricantes MAC (macvendors.com)
 ├── scripts/
-│   ├── 00_validate_router.py  # Verificación previa
-│   ├── 01–09_*.py             # Herramientas de info, monitoreo y control
-│   ├── 10–13_*.py             # Suite QoS (deploy / diagnose / monitor / reset)
-│   ├── 14_backup.py           # Respaldo de configuración (snapshot + .backup)
+│   ├── sys_validar.py  # Verificación previa
+│   ├── info_*.py / mon_*.py   # Información y monitoreo de red
+│   ├── mant_*.py / scan_*.py  # Mantenimiento (log, bloqueo, respaldo) e identificación
+│   ├── horario_internet.py    # Corte de internet programado
+│   ├── qos_*.py               # Suite QoS (desplegar/diagnóstico/monitor/reset)
+│   ├── sys_validar.py         # Verificación previa del router
 │   ├── README_QOS.md          # Guía de la suite QoS
-│   ├── 10_USAGE.md            # Manual detallado del despliegue QoS
-│   └── 10_QUICK_REFERENCE.md  # Referencia rápida QoS
+│   ├── QOS_USAGE.md            # Manual detallado del despliegue QoS
+│   └── QOS_QUICK_REFERENCE.md  # Referencia rápida QoS
 ├── backups/                   # Snapshots del router (en .gitignore)
 ├── tests/                     # Suite de tests (unittest, sin router)
 ├── index.md                   # Referencia técnica: protocolo API + todos los scripts
@@ -111,10 +113,10 @@ routeros-toolkit/
 | Documento | Contenido |
 |-----------|-----------|
 | [`README.md`](README.md) | Este archivo — visión general e inicio rápido |
-| [`index.md`](index.md) | Referencia técnica: protocolo RouterOS API, referencia de uso de cada script (00–09) con sus flags |
-| [`scripts/README_QOS.md`](scripts/README_QOS.md) | Suite QoS: qué hace cada script (10–13) y flujo típico |
-| [`scripts/10_USAGE.md`](scripts/10_USAGE.md) | Manual completo del despliegue QoS: pasos, pruebas, troubleshooting |
-| [`scripts/10_QUICK_REFERENCE.md`](scripts/10_QUICK_REFERENCE.md) | Referencia rápida QoS: clases de tráfico, prioridades, comandos |
+| [`index.md`](index.md) | Referencia técnica: protocolo RouterOS API, referencia de uso de cada script con sus flags |
+| [`scripts/README_QOS.md`](scripts/README_QOS.md) | Suite QoS: qué hace cada script `qos_*` y flujo típico |
+| [`scripts/QOS_USAGE.md`](scripts/QOS_USAGE.md) | Manual completo del despliegue QoS: pasos, pruebas, troubleshooting |
+| [`scripts/QOS_QUICK_REFERENCE.md`](scripts/QOS_QUICK_REFERENCE.md) | Referencia rápida QoS: clases de tráfico, prioridades, comandos |
 | [`QOS_IMPLEMENTATION_SUMMARY.txt`](QOS_IMPLEMENTATION_SUMMARY.txt) | Resumen histórico de la implementación QoS |
 | [`CLAUDE.md`](CLAUDE.md) | Arquitectura y convenciones para asistentes de código |
 
@@ -137,7 +139,7 @@ Ver [`index.md`](index.md) para documentación técnica completa.
 - `config.env` está incluido en `.gitignore` — **nunca se sube al repo**
 - Se recomienda crear un usuario de solo lectura en el router para operaciones de monitoreo
 - La API escucha en la LAN; no exponer el puerto 8728 a internet
-- Los scripts 06, 09, 10 y 13 **modifican configuración real del router** (firewall, QoS, schedulers); el resto son de solo lectura
+- `mant_bloqueo`, `horario_internet`, `qos_desplegar` y `qos_reset` **modifican configuración real del router** (firewall, QoS, schedulers); el resto son de solo lectura
 
 ---
 

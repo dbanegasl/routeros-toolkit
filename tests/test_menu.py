@@ -56,9 +56,9 @@ class TestIntegridadMenu(unittest.TestCase):
         lookup = menu.build_lookup()
         for key, (script, args) in lookup.items():
             inmediato = (
-                (script in ("10_deploy_qos.py", "13_reset_qos.py")
+                (script in ("qos_desplegar.py", "qos_reset.py")
                  and "--dry-run" not in args)
-                or (script == "09_schedule_internet.py" and "--remove" in args)
+                or (script == "horario_internet.py" and "--remove" in args)
             )
             if inmediato:
                 self.assertIn(key, menu.CONFIRMAR,
