@@ -6,15 +6,22 @@ Herramientas de diagnóstico y administración para routers **MikroTik RouterOS*
 
 ## ✨ Características
 
-| Categoría      | Herramienta                  | Descripción                                      |
-|----------------|------------------------------|--------------------------------------------------|
-| 📋 Info         | `01_list_devices.py`         | Inventario de todos los dispositivos en red      |
-| 📋 Info         | `02_top_consumers.py`        | Ranking de consumo de ancho de banda por IP      |
-| 📡 Monitoreo    | `03_live_monitor.py`         | Dashboard en tiempo real (auto-refresh)          |
-| 📡 Monitoreo    | `04_interface_stats.py`      | Tráfico por interfaz física                      |
-| 🔧 Mantenimiento| `05_router_log.py`           | Visor del syslog del router                      |
-| 🔧 Mantenimiento| `06_block_ip.py`             | Bloqueo/desbloqueo de IPs vía firewall           |
-| ⚙️ Sistema      | `07_system_info.py`          | CPU, RAM, uptime e información del hardware      |
+| Categoría       | Herramienta                   | Descripción                                        |
+|-----------------|-------------------------------|----------------------------------------------------|
+| ✅ Validación    | `00_validate_router.py`       | Verificación previa de conectividad y configuración|
+| 📋 Info          | `01_list_devices.py`          | Inventario de todos los dispositivos en red        |
+| 📋 Info          | `02_top_consumers.py`         | Ranking de consumo de ancho de banda por IP        |
+| 📡 Monitoreo     | `03_live_monitor.py`          | Dashboard en tiempo real (auto-refresh)            |
+| 📡 Monitoreo     | `04_interface_stats.py`       | Tráfico por interfaz física                        |
+| 🔧 Mantenimiento | `05_router_log.py`            | Visor del syslog del router (con `--follow`)       |
+| 🔧 Mantenimiento | `06_block_ip.py`              | Bloqueo/desbloqueo de IPs vía firewall             |
+| ⚙️ Sistema       | `07_system_info.py`           | CPU, RAM, uptime e información del hardware        |
+| 🔍 Identificación| `08_scan_devices.py`          | Clasifica dispositivos (Apple, móvil, IoT…) por OUI|
+| ⏰ Horarios      | `09_schedule_internet.py`     | Corte de internet programado; lista blanca persistente |
+| 🚦 QoS           | `10_deploy_qos.py`            | Despliega QoS (config en `config/qos.json`, con `--dry-run`) |
+| 🚦 QoS           | `11_diagnose_qos.py`          | Diagnostica si las reglas Mangle están marcando    |
+| 🚦 QoS           | `12_monitor_qos.py`           | Monitor de tráfico por categoría en tiempo real    |
+| 🚦 QoS           | `13_reset_qos.py`             | Elimina solo los elementos QoS (preserva otras reglas) |
 
 ---
 
@@ -47,11 +54,22 @@ MIKROTIK_USER=admin
 MIKROTIK_PASSWORD=tu_contraseña
 ```
 
+Las variables de entorno del sistema (`MIKROTIK_HOST`, `MIKROTIK_PORT`, `MIKROTIK_USER`, `MIKROTIK_PASSWORD`) sobreescriben el archivo.
+
 ### 3. Ejecutar
 
 ```bash
-python3 menu.py
+python3 menu.py                          # menú interactivo (21 opciones)
+python3 scripts/01_list_devices.py       # o cualquier script standalone
 ```
+
+### 4. Tests (opcional, no requiere router)
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+Todos los scripts usan exit codes consistentes (`0` OK, `1` conexión/login, `2` RouterOS/config, `130` Ctrl+C) y muestran errores como mensajes claros con sugerencias, nunca tracebacks.
 
 ---
 
@@ -59,22 +77,43 @@ python3 menu.py
 
 ```
 routeros-toolkit/
-├── menu.py                  # Menú principal interactivo
-├── config.env.example       # Plantilla de configuración (safe to commit)
-├── config.env               # Credenciales reales (en .gitignore)
+├── menu.py                    # Menú principal interactivo (punto de entrada)
+├── config.env.example         # Plantilla de credenciales (safe to commit)
+├── config.env                 # Credenciales reales (en .gitignore)
+├── config/
+│   ├── qos.json.example       # Plantilla: configuración del despliegue QoS
+│   ├── whitelist.json.example # Plantilla: lista blanca del corte de internet
+│   └── *.json                 # Archivos reales (en .gitignore)
 ├── lib/
-│   ├── mikrotik_api.py      # Cliente RouterOS API + utilidades
-│   └── __init__.py
+│   ├── __init__.py
+│   ├── mikrotik_api.py        # Cliente RouterOS API + utilidades compartidas
+│   ├── app_config.py          # Configuración JSON de la aplicación (config/)
+│   └── oui_cache.json         # Caché de fabricantes MAC (macvendors.com)
 ├── scripts/
-│   ├── 01_list_devices.py
-│   ├── 02_top_consumers.py
-│   ├── 03_live_monitor.py
-│   ├── 04_interface_stats.py
-│   ├── 05_router_log.py
-│   ├── 06_block_ip.py
-│   └── 07_system_info.py
-└── index.md                 # Documentación técnica del protocolo API
+│   ├── 00_validate_router.py  # Verificación previa
+│   ├── 01–09_*.py             # Herramientas de info, monitoreo y control
+│   ├── 10–13_*.py             # Suite QoS (deploy / diagnose / monitor / reset)
+│   ├── README_QOS.md          # Guía de la suite QoS
+│   ├── 10_USAGE.md            # Manual detallado del despliegue QoS
+│   └── 10_QUICK_REFERENCE.md  # Referencia rápida QoS
+├── tests/                     # Suite de tests (unittest, sin router)
+├── index.md                   # Referencia técnica: protocolo API + todos los scripts
+└── CLAUDE.md                  # Guía para asistentes de código (Claude Code)
 ```
+
+---
+
+## 📚 Documentación
+
+| Documento | Contenido |
+|-----------|-----------|
+| [`README.md`](README.md) | Este archivo — visión general e inicio rápido |
+| [`index.md`](index.md) | Referencia técnica: protocolo RouterOS API, referencia de uso de cada script (00–09) con sus flags |
+| [`scripts/README_QOS.md`](scripts/README_QOS.md) | Suite QoS: qué hace cada script (10–13) y flujo típico |
+| [`scripts/10_USAGE.md`](scripts/10_USAGE.md) | Manual completo del despliegue QoS: pasos, pruebas, troubleshooting |
+| [`scripts/10_QUICK_REFERENCE.md`](scripts/10_QUICK_REFERENCE.md) | Referencia rápida QoS: clases de tráfico, prioridades, comandos |
+| [`QOS_IMPLEMENTATION_SUMMARY.txt`](QOS_IMPLEMENTATION_SUMMARY.txt) | Resumen histórico de la implementación QoS |
+| [`CLAUDE.md`](CLAUDE.md) | Arquitectura y convenciones para asistentes de código |
 
 ---
 
@@ -90,38 +129,12 @@ Ver [`index.md`](index.md) para documentación técnica completa.
 
 ---
 
-## 📸 Preview
-
-```
-╔══════════════════════════════════════════════════╗
-║         🌐 MIKROTIK ROUTEROS TOOLKIT             ║
-║             Router: DUOTICS  │  hEX lite          ║
-╚══════════════════════════════════════════════════╝
-
-  📋 INFO
-    1 · Listar dispositivos
-    2 · Top consumidores
-  📡 MONITOREO
-    3 · Monitor en vivo
-    4 · Estadísticas de interfaces
-  🔧 MANTENIMIENTO
-    5 · Ver log del router
-    6 · Bloquear / desbloquear IP
-  ⚙️  SISTEMA
-    7 · Información del sistema
-
-  0 · Salir
-
-Selecciona una opción:
-```
-
----
-
 ## ⚠️ Seguridad
 
 - `config.env` está incluido en `.gitignore` — **nunca se sube al repo**
 - Se recomienda crear un usuario de solo lectura en el router para operaciones de monitoreo
 - La API escucha en la LAN; no exponer el puerto 8728 a internet
+- Los scripts 06, 09, 10 y 13 **modifican configuración real del router** (firewall, QoS, schedulers); el resto son de solo lectura
 
 ---
 
