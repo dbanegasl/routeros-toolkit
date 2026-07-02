@@ -1,0 +1,36 @@
+# Panel web del RouterOS Toolkit — 2 servicios, un solo puerto expuesto.
+#
+# Requisitos previos:
+#   1. config.env con MIKROTIK_* y APP_PASSWORD_HASH
+#      (genera el hash con: python3 backend/generar_hash.py)
+#   2. docker compose up -d
+#   3. Panel en http://<host>:8080  (API: /api/docs)
+#
+# ⚠️ No abrir el puerto 8080 al WAN: es un panel de administración LAN.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file: config.env              # credenciales del router (nunca en la imagen)
+    volumes:
+      - ./config:/app/config          # qos.json, whitelist.json compartidos con el CLI
+      - ./backups:/app/backups
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/salud')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # sin puerto publicado: solo accesible vía el servicio web
+
+  web:
+    build: ./frontend
+    ports:
+      - "${PANEL_PORT:-8080}:80"      # ÚNICO puerto expuesto a la LAN
+                                      # (cámbialo en .env si 8080 está ocupado)
+    depends_on:
+      - api
+    restart: unless-stopped

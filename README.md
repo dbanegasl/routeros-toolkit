@@ -106,11 +106,36 @@ routeros-toolkit/
 │   ├── README_QOS.md          # Guía de la suite QoS
 │   ├── QOS_USAGE.md            # Manual detallado del despliegue QoS
 │   └── QOS_QUICK_REFERENCE.md  # Referencia rápida QoS
+├── backend/                   # Panel web: API FastAPI sobre lib/ + core/
+│   ├── app/                   # main, auth (login/sesiones), deps, routers/
+│   ├── tests/                 # pytest + FakeAPI (sin router)
+│   └── generar_hash.py        # genera APP_PASSWORD_HASH para config.env
+├── frontend/                  # Panel web: nginx + SPA (placeholder en Fase 1)
+├── docker-compose.yml         # 2 servicios: api + web (un solo puerto expuesto)
 ├── backups/                   # Snapshots del router (en .gitignore)
 ├── tests/                     # Suite de tests (unittest, sin router)
 ├── index.md                   # Referencia técnica: protocolo API + todos los scripts
 └── CLAUDE.md                  # Guía para asistentes de código (Claude Code)
 ```
+
+---
+
+## 🌐 Panel web (en construcción — Fase 1: API de lectura)
+
+```bash
+# 1. Genera la contraseña del panel y pégala en config.env:
+python3 backend/generar_hash.py
+
+# 2. Levanta el panel (Docker + docker-compose):
+docker compose up -d
+```
+
+Panel en `http://<host>:8080` (cambiable con `PANEL_PORT` en `.env`; ver
+`.env.example`). La API se documenta sola en `/api/docs` (Swagger); todas
+las rutas exigen login (`POST /api/auth/login`) salvo el healthcheck
+`/api/salud`. En esta fase hay solo **lecturas**: dispositivos, escaneo,
+sistema, interfaces, horario, validación y config. ⚠️ No abras el puerto
+al WAN: es un panel de administración para la LAN.
 
 ---
 

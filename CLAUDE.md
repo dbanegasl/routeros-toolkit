@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Python toolkit for administering a MikroTik RouterOS router (hEX lite, RouterOS v6.49.19) over its native binary API on port 8728. **No external dependencies** — Python 3.6+ standard library only (including the tests, which use `unittest`). There is no build step or linter. Code, comments, and all user-facing output are in **Spanish**; keep new code consistent with that.
+A Python toolkit for administering a MikroTik RouterOS router (hEX lite, RouterOS v6.49.19) over its native binary API on port 8728. The CLI (`lib/`, `core/`, `scripts/`, `menu.py`, `tests/`) has **no external dependencies** — Python 3.6+ standard library only (tests use `unittest`); there is no build step or linter. The web panel (`backend/` FastAPI + `frontend/` nginx, run via `docker compose`) keeps its dependencies isolated in `backend/requirements.txt` and the Docker images — never add web deps to the CLI layers. Code, comments, and all user-facing output are in **Spanish**; keep new code consistent with that.
 
 **Scripts talk to a live production router.** Anything beyond `print` commands (firewall rules, mangle, queues, schedulers, DHCP leases) mutates real router state. Read-only scripts (`sys_validar`, `info_*`, `mon_*`, `mant_log`, `scan_dispositivos`, `qos_diagnostico`, `qos_monitor`, and `mant_respaldo` without `--full`) are safe to run; be deliberate with `mant_bloqueo`, `horario_internet`, `qos_desplegar`, and `qos_reset`. `mant_respaldo.py` writes local JSON snapshots to `backups/` (gitignored); `--full` additionally creates a `.backup` file on the router.
 
@@ -15,6 +15,10 @@ python3 menu.py                          # interactive menu (main entry point)
 python3 scripts/info_dispositivos.py     # any script runs standalone, from repo root
 python3 scripts/sys_validar.py           # pre-flight connectivity/config check
 python3 -m unittest discover -s tests -v # test suite (no router needed)
+
+# Web panel (needs APP_PASSWORD_HASH in config.env — backend/generar_hash.py):
+docker compose up -d                     # panel at http://<host>:${PANEL_PORT:-8080}
+backend/.venv/bin/python -m pytest backend/tests -q  # backend tests (FakeAPI, no router)
 ```
 
 Run the tests after touching `lib/` or the QoS rule builders — they pin the protocol encoding and the exact default QoS plan.
@@ -34,6 +38,9 @@ Credentials come from `config.env` (gitignored; template in `config.env.example`
 - **`core/`** — business logic extracted from the scripts (stdlib only, like `lib/`): `dispositivos.py` (inventory/scan/classification), `monitoreo.py` (consumption, interfaces, system, log), `bloqueos.py`, `horario.py` (schedule rules + persistent whitelist), `qos.py` (plan builders + deploy/reset/diagnostic operations), `respaldo.py` (snapshot + router backup). Modules take an already-connected `MikroTikAPI` and **return data — they never print or prompt**; presentation (ANSI tables, dialogs) stays in `scripts/`. New logic goes here so the CLI and the future web backend share one source (see `PLAN_FRONTEND.md`).
 - **`scripts/<sección>_*.py`** — standalone scripts named by section prefix (`info_`, `mon_`, `mant_`, `scan_`, `horario_`, `qos_`, `sys_`), one task each: thin CLI presentation over `core/`. Each does `sys.path.insert` to import from `lib`/`core` (repo root + `from lib import ...` / `from core.<módulo> import ...`). Scripts follow argparse + ANSI-colored output conventions; copy an existing script's structure when adding one.
 - **`lib/oui_cache.json`** — persisted cache of macvendors.com lookups (written by `scan_dispositivos.py`); committed to the repo.
+- **`backend/`** — FastAPI web API over the same `lib/` + `core/` (see `PLAN_FRONTEND.md`). `app/auth.py`: login against `APP_PASSWORD_HASH` (PBKDF2, stdlib; generate with `backend/generar_hash.py`), in-memory httpOnly-cookie sessions, 5/min login rate-limit — the router password never reaches the browser. `app/deps.py`: `get_api` dependency opens one router connection per request under a **global lock** (never parallel connections to the hEX lite). `app/routers/` mirrors `core/` sections; all routes require the session dependency except `/api/auth/*` and `/api/salud` (healthcheck). Exceptions map like CLI exit codes: `MikroTikConnectionError`/`OSError` → 502, `MikroTikCommandError` → 400, Spanish detail + `sugerencia`. Tests in `backend/tests/` (pytest + FakeAPI injected via `dependency_overrides`; venv at `backend/.venv`, gitignored).
+- **`frontend/`** — nginx serving the SPA (Fase 1: placeholder page) and proxying `/api` and `/ws` to the `api` service; the SPA arrives in Fase 2.
+- **`docker-compose.yml`** — 2 services: `api` (no published port) and `web` (single exposed port, `PANEL_PORT` in `.env`, default 8080). `config.env` is passed via `env_file` (includes `APP_PASSWORD_HASH`); `config/` and `backups/` are volumes shared with the CLI. Backend Dockerfile builds from the **repo root** context (needs `lib/` + `core/`).
 - **`index.md`** — technical reference for the RouterOS API protocol.
 - **`temp/`** — scratch design docs, not part of the toolkit.
 

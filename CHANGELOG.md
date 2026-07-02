@@ -7,6 +7,29 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Agregado (Fase 1 del plan de frontend — 2026-07-02)
+- **Backend FastAPI** (`backend/`): API web sobre `lib/` + `core/` con
+  autenticación completa — login contra `APP_PASSWORD_HASH` (PBKDF2
+  stdlib, generador en `backend/generar_hash.py`), sesiones en cookie
+  httpOnly, rate-limit de 5 intentos/min — y endpoints de **lectura**:
+  `/api/dispositivos`, `/api/escaneo`, `/api/sistema`, `/api/interfaces`,
+  `/api/horario` (con lista blanca y EN RED), `/api/validacion`,
+  `/api/config` (sin secretos) y `/api/salud` (healthcheck público).
+  Acceso al router serializado con candado global (una conexión a la
+  vez). Errores mapeados como los exit codes del CLI: 502
+  conexión/login, 400 trap de RouterOS, en español con sugerencia.
+  Swagger en `/api/docs`.
+- **Docker Compose** (`docker-compose.yml`): servicios `api` (sin puerto
+  publicado) y `web` (nginx con placeholder + proxy `/api` y `/ws`;
+  único puerto expuesto, configurable con `PANEL_PORT` en `.env`).
+  Verificado en WSL2: los contenedores alcanzan el router directamente
+  (no hizo falta `network_mode: host`).
+- **Tests del backend** (`backend/tests/`, pytest + FakeAPI inyectada,
+  sin router): 20 tests — login/401/429/503, logout, todas las rutas
+  exigen sesión, un endpoint por sección y mapeo de excepciones a HTTP.
+- `config.env.example` documenta `APP_PASSWORD_HASH` y
+  `APP_SESSION_TTL`; nuevo `.env.example` con `PANEL_PORT`.
+
 ### Cambiado (Fase 0 del plan de frontend — 2026-07-02)
 - **Nueva capa `core/`** (stdlib puro): la lógica de negocio de los
   scripts se extrajo a módulos reutilizables que reciben una API

@@ -43,7 +43,7 @@ El **menú principal** tiene 7 categorías y 29 opciones. Selecciona con número
 
 Todos los scripts funcionan también standalone desde la raíz del proyecto.
 
-La lógica de negocio vive en **`core/`** (stdlib puro, sin prints): los scripts de `scripts/` son la capa de presentación CLI sobre esos módulos (`core/dispositivos.py`, `core/monitoreo.py`, `core/bloqueos.py`, `core/horario.py`, `core/qos.py`, `core/respaldo.py`). Esto permite que un futuro backend web reutilice la misma lógica sin duplicarla.
+La lógica de negocio vive en **`core/`** (stdlib puro, sin prints): los scripts de `scripts/` son la capa de presentación CLI sobre esos módulos (`core/dispositivos.py`, `core/monitoreo.py`, `core/bloqueos.py`, `core/horario.py`, `core/qos.py`, `core/respaldo.py`). Sobre esa misma capa corre el **panel web** (`backend/` FastAPI + `frontend/` nginx, vía `docker compose up -d`): endpoints de lectura protegidos por login propio de la app, documentados en `/api/docs` (Swagger). Ver README § Panel web.
 
 ---
 
