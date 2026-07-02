@@ -31,48 +31,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from lib import MikroTikAPI, load_config, print_header, load_json_config, run_script
-
-
-# ---------------------------------------------------------------------------
-# Configuración (config/qos.json)
-# ---------------------------------------------------------------------------
-
-QOS_DEFAULTS = {
-    "dispositivo_prioritario": {
-        "nombre": "Kevin KUTOGG",
-        "mac": "F0:2F:74:CB:97:3F",
-        "ip": "192.168.5.22",
-    },
-    "interfaz_wan": "ether1",
-    "bridge_lan": "bridge1",
-    "descarga_total_mbps": 100,
-    "subida_total_mbps": 100,
-    "umbral_bulk_mb": 30,
-}
-
-
-def load_qos_config() -> dict:
-    """Lee config/qos.json completando faltantes con los defaults."""
-    qos = load_json_config("qos", default=QOS_DEFAULTS)
-    # Merge profundo del sub-dict del dispositivo (claves parciales)
-    device = dict(QOS_DEFAULTS["dispositivo_prioritario"])
-    device.update(qos.get("dispositivo_prioritario", {}))
-    qos["dispositivo_prioritario"] = device
-    return qos
-
-
-def _scale_limit(value: str, factor: float) -> str:
-    """Escala un límite RouterOS ('85M', '512k') por un factor.
-
-    Con factor 1.0 retorna el valor intacto, así el plan por defecto
-    (100 Mbps) genera exactamente las mismas reglas de siempre.
-    """
-    if factor == 1.0:
-        return value
-    unit = value[-1]
-    n = max(1, int(int(value[:-1]) * factor))
-    return f"{n}{unit}"
+from lib import MikroTikAPI, load_config, print_header, run_script
+from core.qos import (load_qos_config, build_mangle_rules, build_queue_tree,
+                      mangle_params, buscar_lease, fijar_ip_estatica,
+                      buscar_fasttrack, deshabilitar_fasttrack,
+                      rehabilitar_fasttrack, eliminar_reglas_mangle,
+                      eliminar_colas, aplicar_reglas_mangle, crear_colas)
 
 
 def print_step(step_num: int, description: str):
@@ -92,8 +56,7 @@ def step_0_verify(api: MikroTikAPI, qos: dict):
         print(f"  • {iface.get('name', 'N/A')} (running: {iface.get('running', 'N/A')})")
 
     print("\n🚀 Estado de FastTrack:")
-    fasttrack = api.command('/ip/firewall/filter/print',
-                            queries=['?action=fasttrack-connection'])
+    fasttrack = buscar_fasttrack(api)
     if fasttrack:
         for rule in fasttrack:
             status = "❌ ACTIVO" if rule.get('disabled') == 'false' else "✓ Deshabilitado"
@@ -102,8 +65,7 @@ def step_0_verify(api: MikroTikAPI, qos: dict):
         print("  ℹ️  No hay reglas FastTrack configuradas")
 
     print(f"\n👤 Buscando IP de {device['nombre']} (MAC: {device['mac']}):")
-    leases = api.command('/ip/dhcp-server/lease/print',
-                         queries=[f"?mac-address={device['mac']}"])
+    leases = buscar_lease(api, device['mac'])
     if leases:
         for lease in leases:
             print(f"  ✓ {lease.get('address', 'N/A')} — {lease.get('host-name', 'N/A')}")
@@ -119,8 +81,7 @@ def step_1_static_ip(api: MikroTikAPI, qos: dict, dry_run: bool = False):
     print_step(1, f"Fijar IP estática de {device['nombre']} ({device['ip']})")
 
     comment = f"{device['nombre']} - IP fija garantizada"
-    existing = api.command('/ip/dhcp-server/lease/print',
-                           queries=[f"?mac-address={device['mac']}"])
+    existing = buscar_lease(api, device['mac'])
 
     if dry_run:
         accion = "actualizaría" if existing else "crearía"
@@ -132,17 +93,11 @@ def step_1_static_ip(api: MikroTikAPI, qos: dict, dry_run: bool = False):
         print(f"  ℹ️  Lease existente para {device['nombre']}. Actualizando...")
         lease_id = existing[0].get('.id', '')
         if lease_id:
-            api.command('/ip/dhcp-server/lease/set',
-                        params=[f'=.id={lease_id}',
-                                f"=address={device['ip']}",
-                                f'=comment={comment}'])
+            fijar_ip_estatica(api, device, lease_id=lease_id)
             print(f"  ✓ IP estática confirmada")
     else:
         print(f"  ℹ️  Creando nuevo lease para {device['nombre']}...")
-        api.command('/ip/dhcp-server/lease/add',
-                    params=[f"=mac-address={device['mac']}",
-                            f"=address={device['ip']}",
-                            f'=comment={comment}'])
+        fijar_ip_estatica(api, device)
         print(f"  ✓ IP estática creada")
 
 
@@ -150,8 +105,7 @@ def step_2_disable_fasttrack(api: MikroTikAPI, dry_run: bool = False):
     """Deshabilitar FastTrack."""
     print_step(2, "Deshabilitar FastTrack")
 
-    fasttrack = api.command('/ip/firewall/filter/print',
-                            queries=['?action=fasttrack-connection'])
+    fasttrack = buscar_fasttrack(api)
     if fasttrack:
         for rule in fasttrack:
             rule_id = rule.get('.id', '')
@@ -161,8 +115,7 @@ def step_2_disable_fasttrack(api: MikroTikAPI, dry_run: bool = False):
                 print(f"  🔍 [dry-run] Se deshabilitaría FastTrack: "
                       f"{rule.get('comment', 'sin comentario')}")
                 continue
-            api.command('/ip/firewall/filter/set',
-                        params=[f'=.id={rule_id}', '=disabled=yes'])
+            deshabilitar_fasttrack(api, [rule])
             print(f"  ✓ Regla FastTrack deshabilitada: {rule.get('comment', 'sin comentario')}")
     else:
         print(f"  ℹ️  No hay reglas FastTrack para deshabilitar")
@@ -179,11 +132,7 @@ def step_3_cleanup_qos(api: MikroTikAPI, dry_run: bool = False):
             print(f"  🔍 [dry-run] Se eliminarían {len(mangle_rules)} reglas Mangle")
         else:
             print(f"  🗑️  Eliminando {len(mangle_rules)} reglas Mangle...")
-            for rule in mangle_rules:
-                rule_id = rule.get('.id', '')
-                if rule_id:
-                    api.command('/ip/firewall/mangle/remove',
-                                params=[f'=.id={rule_id}'])
+            eliminar_reglas_mangle(api, mangle_rules)
             print(f"  ✓ {len(mangle_rules)} reglas Mangle eliminadas")
     else:
         print(f"  ℹ️  No hay reglas Mangle previas")
@@ -196,265 +145,10 @@ def step_3_cleanup_qos(api: MikroTikAPI, dry_run: bool = False):
             print(f"  🔍 [dry-run] Se eliminarían {len(queues)} colas Queue Tree")
         else:
             print(f"  🗑️  Eliminando {len(queues)} colas Queue Tree...")
-            for queue in reversed(queues):
-                queue_id = queue.get('.id', '')
-                if queue_id:
-                    api.command('/queue/tree/remove',
-                                params=[f'=.id={queue_id}'])
+            eliminar_colas(api, queues)
             print(f"  ✓ {len(queues)} colas Queue Tree eliminadas")
     else:
         print(f"  ℹ️  No hay colas Queue Tree previas")
-
-
-def build_mangle_rules(qos: dict) -> list:
-    """Construye la lista de reglas Mangle según la configuración.
-
-    Función pura (sin API): con los defaults genera exactamente el plan
-    original de Kevin. Testeable sin router.
-    """
-    device = qos["dispositivo_prioritario"]
-    ip = device["ip"]
-    alias = device["nombre"].split()[0]          # "Kevin KUTOGG" → "Kevin"
-    umbral_mb = int(qos.get("umbral_bulk_mb", 30))
-    umbral_bytes = umbral_mb * 1_000_000
-
-    return [
-        # ============================================================
-        # BLOQUE 1: CRÍTICO — DNS e ICMP
-        # ============================================================
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'protocol': 'udp',
-            'dst-port': '53',
-            'new-connection-mark': 'conn_critico',
-            'passthrough': 'yes',
-            'comment': 'QoS P1 - DNS UDP'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'protocol': 'tcp',
-            'dst-port': '53',
-            'new-connection-mark': 'conn_critico',
-            'passthrough': 'yes',
-            'comment': 'QoS P1 - DNS TCP (DNSSEC)'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'protocol': 'icmp',
-            'new-connection-mark': 'conn_critico',
-            'passthrough': 'yes',
-            'comment': 'QoS P1 - ICMP Ping'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-packet',
-            'connection-mark': 'conn_critico',
-            'new-packet-mark': 'pkt_critico',
-            'passthrough': 'no',
-            'comment': 'QoS P1 - Marcar paquetes criticos'
-        },
-
-        # ============================================================
-        # BLOQUE 2: DISPOSITIVO PRIORITARIO — TODO su tráfico
-        # ============================================================
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'src-address': ip,
-            'new-connection-mark': 'conn_kevin',
-            'passthrough': 'yes',
-            'comment': f'QoS P2 - {alias} origen (upload + gaming)'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'dst-address': ip,
-            'new-connection-mark': 'conn_kevin',
-            'passthrough': 'yes',
-            'comment': f'QoS P2 - {alias} destino (download + respuestas juegos)'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-packet',
-            'connection-mark': 'conn_kevin',
-            'new-packet-mark': 'pkt_kevin',
-            'passthrough': 'no',
-            'comment': f'QoS P2 - Marcar paquetes {alias} (gaming + OBS + todo)'
-        },
-
-        # ============================================================
-        # BLOQUE 3: DESCARGAS PESADAS (BULK)
-        # ============================================================
-        {
-            'chain': 'forward',
-            'action': 'mark-connection',
-            'protocol': 'tcp',
-            'connection-bytes': f'{umbral_bytes}-0',
-            'connection-mark': '!conn_kevin',
-            'new-connection-mark': 'conn_bulk',
-            'passthrough': 'yes',
-            'comment': f'QoS P8 - Cualquier TCP >{umbral_mb}MB excluye {alias}'
-        },
-        {
-            'chain': 'forward',
-            'action': 'mark-packet',
-            'connection-mark': 'conn_bulk',
-            'new-packet-mark': 'pkt_bulk',
-            'passthrough': 'no',
-            'comment': 'QoS P8 - Marcar paquetes bulk/descarga pesada'
-        },
-
-        # ============================================================
-        # BLOQUE 4: TRABAJO — SSH, RDP, VPN, puertos dev
-        # ============================================================
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'protocol': 'tcp',
-            'dst-port': '22,2222',
-            'new-connection-mark': 'conn_trabajo',
-            'passthrough': 'yes',
-            'comment': 'QoS P3 - SSH'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'protocol': 'tcp',
-            'dst-port': '3389',
-            'new-connection-mark': 'conn_trabajo',
-            'passthrough': 'yes',
-            'comment': 'QoS P3 - RDP'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'protocol': 'tcp',
-            'dst-port': '5900',
-            'new-connection-mark': 'conn_trabajo',
-            'passthrough': 'yes',
-            'comment': 'QoS P3 - VNC'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'protocol': 'udp',
-            'dst-port': '51820',
-            'new-connection-mark': 'conn_trabajo',
-            'passthrough': 'yes',
-            'comment': 'QoS P3 - WireGuard VPN'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'protocol': 'udp',
-            'dst-port': '1194,1195',
-            'new-connection-mark': 'conn_trabajo',
-            'passthrough': 'yes',
-            'comment': 'QoS P3 - OpenVPN'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'protocol': 'tcp',
-            'dst-port': '3000,4000,5000,8000,8080,8443,9000',
-            'new-connection-mark': 'conn_trabajo',
-            'passthrough': 'yes',
-            'comment': 'QoS P3 - Puertos dev (Docker, APIs locales, etc)'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'protocol': 'tcp',
-            'dst-port': '25,587,993,995',
-            'new-connection-mark': 'conn_trabajo',
-            'passthrough': 'yes',
-            'comment': 'QoS P3 - Correo electronico'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-packet',
-            'connection-mark': 'conn_trabajo',
-            'new-packet-mark': 'pkt_trabajo',
-            'passthrough': 'no',
-            'comment': 'QoS P3 - Marcar paquetes trabajo/dev'
-        },
-
-        # ============================================================
-        # BLOQUE 5: STREAMING ADULTOS — HTTPS (port 443)
-        # ============================================================
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'protocol': 'tcp',
-            'dst-port': '443',
-            'connection-mark': '!conn_kevin',
-            'new-connection-mark': 'conn_streaming',
-            'passthrough': 'yes',
-            'comment': 'QoS P5 - HTTPS streaming adultos (Netflix/HBO)'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-packet',
-            'connection-mark': 'conn_streaming',
-            'new-packet-mark': 'pkt_streaming',
-            'passthrough': 'no',
-            'comment': 'QoS P5 - Marcar paquetes streaming adultos'
-        },
-
-        # ============================================================
-        # BLOQUE 6: WEB GENERAL — HTTP (port 80)
-        # ============================================================
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'protocol': 'tcp',
-            'dst-port': '80',
-            'connection-mark': '!conn_kevin',
-            'new-connection-mark': 'conn_web',
-            'passthrough': 'yes',
-            'comment': 'QoS P6 - HTTP general'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-packet',
-            'connection-mark': 'conn_web',
-            'new-packet-mark': 'pkt_web',
-            'passthrough': 'no',
-            'comment': 'QoS P6 - Marcar paquetes web general'
-        },
-
-        # ============================================================
-        # BLOQUE 7: FALLBACK — Todo lo que no encajó
-        # ============================================================
-        {
-            'chain': 'prerouting',
-            'action': 'mark-connection',
-            'connection-mark': 'no-mark',
-            'new-connection-mark': 'conn_resto',
-            'passthrough': 'yes',
-            'comment': 'QoS P7 - Fallback todo lo demas'
-        },
-        {
-            'chain': 'prerouting',
-            'action': 'mark-packet',
-            'connection-mark': 'conn_resto',
-            'new-packet-mark': 'pkt_resto',
-            'passthrough': 'no',
-            'comment': 'QoS P7 - Marcar paquetes sin clasificar'
-        },
-    ]
-
-
-def _mangle_params(rule: dict) -> list:
-    """Convierte un dict de regla Mangle a params '=clave=valor' para el API."""
-    params = [f'=chain={rule["chain"]}', f'=action={rule["action"]}']
-    for key, value in rule.items():
-        if key not in ('chain', 'action'):
-            params.append(f'={key}={value}')
-    return params
 
 
 def step_4_apply_mangle(api: MikroTikAPI, qos: dict, dry_run: bool = False):
@@ -465,205 +159,20 @@ def step_4_apply_mangle(api: MikroTikAPI, qos: dict, dry_run: bool = False):
     if dry_run:
         print(f"\n  🔍 [dry-run] Se aplicarían {len(mangle_rules)} reglas Mangle:")
         for i, rule in enumerate(mangle_rules, 1):
-            detalle = " ".join(p.lstrip("=") for p in _mangle_params(rule)
+            detalle = " ".join(p.lstrip("=") for p in mangle_params(rule)
                                if not p.startswith("=comment"))
             print(f"    [{i:2d}/{len(mangle_rules)}] {rule['comment']}")
             print(f"            {detalle}")
         return
 
     print(f"\n  📝 Aplicando {len(mangle_rules)} reglas Mangle...")
-    for i, rule in enumerate(mangle_rules, 1):
-        try:
-            api.command('/ip/firewall/mangle/add', params=_mangle_params(rule))
+    for i, (rule, error) in enumerate(aplicar_reglas_mangle(api, mangle_rules), 1):
+        if error is None:
             print(f"    ✓ [{i:2d}/{len(mangle_rules)}] {rule['comment']}")
-        except Exception as e:
-            print(f"    ❌ [{i:2d}/{len(mangle_rules)}] {rule['comment']} — ERROR: {e}")
+        else:
+            print(f"    ❌ [{i:2d}/{len(mangle_rules)}] {rule['comment']} — ERROR: {error}")
 
     print(f"\n  ✓ {len(mangle_rules)} reglas Mangle aplicadas")
-
-
-def build_queue_tree(qos: dict) -> list:
-    """Construye la lista de colas Queue Tree según la configuración.
-
-    Función pura (sin API). Los límites del plan asumen 100 Mbps; si la
-    config define otro total, todos los límites se escalan en proporción.
-    """
-    device = qos["dispositivo_prioritario"]
-    nombre = device["nombre"]
-    alias = nombre.split()[0]
-    umbral_mb = int(qos.get("umbral_bulk_mb", 30))
-
-    queues = [
-        # ── COLAS RAÍZ ──
-        {
-            'name': 'QoS_Download',
-            'parent': qos["bridge_lan"],
-            'max-limit': '85M',
-            'comment': 'Cola raiz download - trafico hacia LAN'
-        },
-        {
-            'name': 'QoS_Upload',
-            'parent': qos["interfaz_wan"],
-            'max-limit': '85M',
-            'comment': 'Cola raiz upload - trafico saliente hacia internet'
-        },
-
-        # ── SUB-COLAS DOWNLOAD ──
-        {
-            'name': 'DL-1-Critico',
-            'parent': 'QoS_Download',
-            'packet-mark': 'pkt_critico',
-            'priority': '1',
-            'limit-at': '3M',
-            'max-limit': '85M',
-            'queue': 'default',
-            'comment': 'DNS + ICMP - pasan siempre'
-        },
-        {
-            'name': 'DL-2-Kevin',
-            'parent': 'QoS_Download',
-            'packet-mark': 'pkt_kevin',
-            'priority': '2',
-            'limit-at': '30M',
-            'max-limit': '85M',
-            'queue': 'default',
-            'comment': f'{nombre} - gaming y stream garantizados'
-        },
-        {
-            'name': 'DL-3-Trabajo',
-            'parent': 'QoS_Download',
-            'packet-mark': 'pkt_trabajo',
-            'priority': '3',
-            'limit-at': '10M',
-            'max-limit': '70M',
-            'queue': 'default',
-            'comment': 'Daniel - SSH VPN dev trabajo'
-        },
-        {
-            'name': 'DL-5-Streaming',
-            'parent': 'QoS_Download',
-            'packet-mark': 'pkt_streaming',
-            'priority': '5',
-            'limit-at': '8M',
-            'max-limit': '55M',
-            'queue': 'default',
-            'comment': 'Netflix HBO YouTube adultos'
-        },
-        {
-            'name': 'DL-6-Web',
-            'parent': 'QoS_Download',
-            'packet-mark': 'pkt_web',
-            'priority': '6',
-            'limit-at': '5M',
-            'max-limit': '60M',
-            'queue': 'default',
-            'comment': 'HTTP navegacion general'
-        },
-        {
-            'name': 'DL-7-Resto',
-            'parent': 'QoS_Download',
-            'packet-mark': 'pkt_resto',
-            'priority': '7',
-            'limit-at': '3M',
-            'max-limit': '45M',
-            'queue': 'default',
-            'comment': 'Trafico sin clasificar'
-        },
-        {
-            'name': 'DL-8-Bulk',
-            'parent': 'QoS_Download',
-            'packet-mark': 'pkt_bulk',
-            'priority': '8',
-            'limit-at': '2M',
-            'max-limit': '25M',
-            'queue': 'default',
-            'comment': f'Descargas pesadas >{umbral_mb}MB - cede ante {alias} automaticamente'
-        },
-
-        # ── SUB-COLAS UPLOAD ──
-        {
-            'name': 'UL-1-Critico',
-            'parent': 'QoS_Upload',
-            'packet-mark': 'pkt_critico',
-            'priority': '1',
-            'limit-at': '2M',
-            'max-limit': '85M',
-            'queue': 'default',
-            'comment': 'DNS + ICMP upload'
-        },
-        {
-            'name': 'UL-2-Kevin',
-            'parent': 'QoS_Upload',
-            'packet-mark': 'pkt_kevin',
-            'priority': '2',
-            'limit-at': '30M',
-            'max-limit': '85M',
-            'queue': 'default',
-            'comment': f'{alias} OBS upload - NUNCA se toca aunque la red este saturada'
-        },
-        {
-            'name': 'UL-3-Trabajo',
-            'parent': 'QoS_Upload',
-            'packet-mark': 'pkt_trabajo',
-            'priority': '3',
-            'limit-at': '5M',
-            'max-limit': '40M',
-            'queue': 'default',
-            'comment': 'SSH git push VPN upload trabajo'
-        },
-        {
-            'name': 'UL-5-Streaming',
-            'parent': 'QoS_Upload',
-            'packet-mark': 'pkt_streaming',
-            'priority': '5',
-            'limit-at': '2M',
-            'max-limit': '20M',
-            'queue': 'default',
-            'comment': 'ACKs video adultos'
-        },
-        {
-            'name': 'UL-6-Web',
-            'parent': 'QoS_Upload',
-            'packet-mark': 'pkt_web',
-            'priority': '6',
-            'limit-at': '2M',
-            'max-limit': '20M',
-            'queue': 'default',
-            'comment': 'HTTP upload general'
-        },
-        {
-            'name': 'UL-7-Resto',
-            'parent': 'QoS_Upload',
-            'packet-mark': 'pkt_resto',
-            'priority': '7',
-            'limit-at': '1M',
-            'max-limit': '10M',
-            'queue': 'default',
-            'comment': 'Upload trafico sin clasificar'
-        },
-        {
-            'name': 'UL-8-Bulk',
-            'parent': 'QoS_Upload',
-            'packet-mark': 'pkt_bulk',
-            'priority': '8',
-            'limit-at': '512k',
-            'max-limit': '3M',
-            'queue': 'default',
-            'comment': 'Upload bulk (backups, workshop uploads, etc)'
-        },
-    ]
-
-    # Escalar límites si el ancho de banda configurado no es 100 Mbps
-    factor_dl = float(qos.get("descarga_total_mbps", 100)) / 100
-    factor_ul = float(qos.get("subida_total_mbps", 100)) / 100
-    for q in queues:
-        factor = factor_dl if q["name"].startswith(("QoS_Download", "DL-")) \
-                 else factor_ul
-        for key in ("limit-at", "max-limit"):
-            if key in q:
-                q[key] = _scale_limit(q[key], factor)
-
-    return queues
 
 
 def step_5_apply_queue_tree(api: MikroTikAPI, qos: dict, dry_run: bool = False):
@@ -682,13 +191,11 @@ def step_5_apply_queue_tree(api: MikroTikAPI, qos: dict, dry_run: bool = False):
         return
 
     print(f"\n  📝 Creando {len(queues)} colas Queue Tree...")
-    for i, queue in enumerate(queues, 1):
-        params = [f'={key}={value}' for key, value in queue.items()]
-        try:
-            api.command('/queue/tree/add', params=params)
+    for i, (queue, error) in enumerate(crear_colas(api, queues), 1):
+        if error is None:
             print(f"    ✓ [{i:2d}/{len(queues)}] {queue['name']} — {queue['comment']}")
-        except Exception as e:
-            print(f"    ❌ [{i:2d}/{len(queues)}] {queue['name']} — ERROR: {e}")
+        else:
+            print(f"    ❌ [{i:2d}/{len(queues)}] {queue['name']} — ERROR: {error}")
 
     print(f"\n  ✓ {len(queues)} colas Queue Tree creadas")
 
@@ -709,8 +216,7 @@ def step_6_verify(api: MikroTikAPI, qos: dict):
     print(f"  ✓ {len(queues)} colas Queue Tree activas")
 
     # Mostrar estado de FastTrack
-    fasttrack = api.command('/ip/firewall/filter/print',
-                            queries=['?action=fasttrack-connection'])
+    fasttrack = buscar_fasttrack(api)
     if fasttrack:
         for rule in fasttrack:
             disabled = rule.get('disabled') == 'true'
@@ -720,8 +226,7 @@ def step_6_verify(api: MikroTikAPI, qos: dict):
         print(f"  ℹ️  No hay reglas FastTrack")
 
     # Mostrar IP del dispositivo prioritario
-    leases = api.command('/ip/dhcp-server/lease/print',
-                         queries=[f"?mac-address={device['mac']}"])
+    leases = buscar_lease(api, device['mac'])
     if leases:
         for lease in leases:
             print(f"  ✓ IP fija de {device['nombre']}: {lease.get('address', 'N/A')}")
@@ -754,28 +259,16 @@ def rollback(api: MikroTikAPI):
 
     print("\n🗑️  Eliminando todas las reglas Mangle...")
     mangle = api.command('/ip/firewall/mangle/print')
-    for rule in mangle:
-        rule_id = rule.get('.id', '')
-        if rule_id:
-            api.command('/ip/firewall/mangle/remove', params=[f'=.id={rule_id}'])
+    eliminar_reglas_mangle(api, mangle)
     print(f"  ✓ {len(mangle)} reglas Mangle eliminadas")
 
     print("\n🗑️  Eliminando todas las colas Queue Tree...")
     queues = api.command('/queue/tree/print')
-    for queue in reversed(queues):
-        queue_id = queue.get('.id', '')
-        if queue_id:
-            api.command('/queue/tree/remove', params=[f'=.id={queue_id}'])
+    eliminar_colas(api, queues)
     print(f"  ✓ {len(queues)} colas Queue Tree eliminadas")
 
     print("\n🚀 Rehabilitando FastTrack...")
-    fasttrack = api.command('/ip/firewall/filter/print',
-                            queries=['?action=fasttrack-connection'])
-    for rule in fasttrack:
-        rule_id = rule.get('.id', '')
-        if rule_id:
-            api.command('/ip/firewall/filter/set',
-                        params=[f'=.id={rule_id}', '=disabled=no'])
+    rehabilitar_fasttrack(api, solo_deshabilitadas=False)
     print(f"  ✓ FastTrack rehabilitado")
 
     print("\n" + "=" * 70)

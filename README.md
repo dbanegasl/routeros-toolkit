@@ -90,13 +90,19 @@ routeros-toolkit/
 │   ├── mikrotik_api.py        # Cliente RouterOS API + utilidades compartidas
 │   ├── app_config.py          # Configuración JSON de la aplicación (config/)
 │   └── oui_cache.json         # Caché de fabricantes MAC (macvendors.com)
-├── scripts/
-│   ├── sys_validar.py  # Verificación previa
+├── core/                      # Lógica de negocio (stdlib puro, sin prints)
+│   ├── dispositivos.py        # Inventario, escaneo y clasificación
+│   ├── monitoreo.py           # Consumo, interfaces, sistema, log
+│   ├── bloqueos.py            # Bloqueo/desbloqueo de IPs
+│   ├── horario.py             # Corte por horario + lista blanca
+│   ├── qos.py                 # Builders y operaciones del plan QoS
+│   └── respaldo.py            # Snapshot local + .backup en el router
+├── scripts/                   # CLI: presentación fina sobre core/
+│   ├── sys_validar.py         # Verificación previa del router
 │   ├── info_*.py / mon_*.py   # Información y monitoreo de red
 │   ├── mant_*.py / scan_*.py  # Mantenimiento (log, bloqueo, respaldo) e identificación
 │   ├── horario_internet.py    # Corte de internet programado
 │   ├── qos_*.py               # Suite QoS (desplegar/diagnóstico/monitor/reset)
-│   ├── sys_validar.py         # Verificación previa del router
 │   ├── README_QOS.md          # Guía de la suite QoS
 │   ├── QOS_USAGE.md            # Manual detallado del despliegue QoS
 │   └── QOS_QUICK_REFERENCE.md  # Referencia rápida QoS

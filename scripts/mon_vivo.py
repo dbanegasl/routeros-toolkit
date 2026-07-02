@@ -23,39 +23,16 @@ import sys
 import os
 import time
 import argparse
-from collections import defaultdict
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from lib import (MikroTikAPI, load_config, fmt_speed, fmt_bytes,
                  build_name_map, C, get_lan_prefix,
                  run_script)
+from core.monitoreo import snapshot_consumo, ordenar_consumo
 
 
 def clear_screen():
     print("\033[H\033[J", end="", flush=True)
-
-
-def get_snapshot(api, lan: str) -> dict:
-    """
-    Lee el connection tracking y retorna métricas acumuladas por IP.
-    Retorna dict: ip → {'dl_rate', 'ul_rate', 'dl_total', 'ul_total', 'conns'}
-    """
-    conns = api.command("/ip/firewall/connection/print")
-    data: dict = defaultdict(lambda: dict(dl_rate=0, ul_rate=0,
-                                          dl_total=0, ul_total=0, conns=0))
-    for c in conns:
-        src = c.get("src-address", "").split(":")[0]
-        if not src.startswith(lan):
-            continue
-        d = data[src]
-        d["dl_rate"]  += int(c.get("repl-rate", 0))
-        d["ul_rate"]  += int(c.get("orig-rate", 0))
-        d["dl_total"] += (int(c.get("repl-bytes", 0)) +
-                          int(c.get("repl-fasttrack-bytes", 0)))
-        d["ul_total"] += (int(c.get("orig-bytes", 0)) +
-                          int(c.get("orig-fasttrack-bytes", 0)))
-        d["conns"]    += 1
-    return dict(data), len(conns)
 
 
 def render(snapshot: dict, ip_name: dict, top: int, host: str,
@@ -69,9 +46,7 @@ def render(snapshot: dict, ip_name: dict, top: int, host: str,
           f"{C.DIM}(refresh #{iteration}, {elapsed:.1f}s)   Ctrl+C para salir{C.RESET}")
     print()
 
-    ranked = sorted(snapshot.items(),
-                    key=lambda kv: kv[1]["dl_rate"] + kv[1]["ul_rate"],
-                    reverse=True)
+    ranked = ordenar_consumo(snapshot, por="rate")
 
     # Filtrar IPs sin actividad reciente
     active = [(ip, d) for ip, d in ranked
@@ -124,7 +99,7 @@ def main():
         try:
             while True:
                 t0 = time.time()
-                snapshot, total_conns = get_snapshot(api, lan)
+                snapshot, total_conns = snapshot_consumo(api, lan)
                 elapsed = time.time() - t0
                 iteration += 1
                 render(snapshot, ip_name, args.top, cfg["host"],

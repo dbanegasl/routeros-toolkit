@@ -42,12 +42,12 @@ Uso:
 import sys
 import os
 import argparse
-from collections import defaultdict
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from lib import (MikroTikAPI, load_config, fmt_speed, fmt_bytes,
                  build_name_map, C, get_lan_prefix,
                  run_script)
+from core.monitoreo import snapshot_consumo, ordenar_consumo
 
 
 def main():
@@ -72,38 +72,8 @@ def main():
         ip_name = build_name_map(api)
         lan = get_lan_prefix(api)
 
-        # Leer todas las conexiones activas
-        conns = api.command("/ip/firewall/connection/print")
-
-        # Acumular métricas por IP LAN de origen
-        dl_rate   = defaultdict(int)
-        ul_rate   = defaultdict(int)
-        dl_total  = defaultdict(int)
-        ul_total  = defaultdict(int)
-        num_conns = defaultdict(int)
-
-        for c in conns:
-            src = c.get("src-address", "").split(":")[0]
-            if not src.startswith(lan):
-                continue
-            dl_rate[src]   += int(c.get("repl-rate", 0))
-            ul_rate[src]   += int(c.get("orig-rate", 0))
-            dl_total[src]  += (int(c.get("repl-bytes", 0)) +
-                               int(c.get("repl-fasttrack-bytes", 0)))
-            ul_total[src]  += (int(c.get("orig-bytes", 0)) +
-                               int(c.get("orig-fasttrack-bytes", 0)))
-            num_conns[src] += 1
-
-        # Ordenar
-        all_ips = set(list(dl_rate) + list(dl_total))
-        if args.sort == "rate":
-            ranked = sorted(all_ips,
-                            key=lambda ip: dl_rate[ip] + ul_rate[ip],
-                            reverse=True)
-        else:
-            ranked = sorted(all_ips,
-                            key=lambda ip: dl_total[ip] + ul_total[ip],
-                            reverse=True)
+        data, total_conns = snapshot_consumo(api, lan)
+        ranked = ordenar_consumo(data, por=args.sort)
 
         # ── Encabezado ────────────────────────────────────────────────────
         sep = "─" * 98
@@ -116,14 +86,14 @@ def main():
         shown = 0
         winner = None
 
-        for ip in ranked:
+        for ip, d in ranked:
             if shown >= args.top:
                 break
-            if dl_total[ip] + ul_total[ip] == 0:
+            if d["dl_total"] + d["ul_total"] == 0:
                 continue
 
-            dl_r = dl_rate[ip]
-            ul_r = ul_rate[ip]
+            dl_r = d["dl_rate"]
+            ul_r = d["ul_rate"]
             name = ip_name.get(ip, ip)[:29]
 
             # Color según velocidad de descarga
@@ -135,30 +105,30 @@ def main():
             print(f"{prefix} {C.BOLD}{name:<30}{C.RESET} {C.CYAN}{ip:<16}{C.RESET}"
                   f" {speed_col}{fmt_speed(dl_r):>13}{C.RESET}"
                   f" {C.GREEN}{fmt_speed(ul_r):>13}{C.RESET}"
-                  f" {fmt_bytes(dl_total[ip]):>11}"
-                  f" {fmt_bytes(ul_total[ip]):>11}"
-                  f" {C.DIM}{num_conns[ip]:>6}{C.RESET}")
+                  f" {fmt_bytes(d['dl_total']):>11}"
+                  f" {fmt_bytes(d['ul_total']):>11}"
+                  f" {C.DIM}{d['conns']:>6}{C.RESET}")
 
             if winner is None:
                 winner = ip
             shown += 1
 
         print(f"{C.BOLD}{sep}{C.RESET}")
-        print(f"\n  {C.DIM}Conexiones activas totales: {len(conns)}{C.RESET}")
+        print(f"\n  {C.DIM}Conexiones activas totales: {total_conns}{C.RESET}")
 
         # ── Resumen del ganador ───────────────────────────────────────────
         if winner:
+            w = data[winner]
             w_name = ip_name.get(winner, winner)
             print(f"\n  {C.ERR}🔴 Mayor consumidor:{C.RESET} "
                   f"{C.BOLD}{w_name}{C.RESET} "
                   f"{C.DIM}({winner}){C.RESET}")
-            print(f"     {C.BOLD}↓ {fmt_speed(dl_rate[winner])}{C.RESET}  "
-                  f"↑ {fmt_speed(ul_rate[winner])}  "
+            print(f"     {C.BOLD}↓ {fmt_speed(w['dl_rate'])}{C.RESET}  "
+                  f"↑ {fmt_speed(w['ul_rate'])}  "
                   f"{C.DIM}|{C.RESET}  "
-                  f"Sesión: DL {C.BOLD}{fmt_bytes(dl_total[winner])}{C.RESET}  "
-                  f"UL {fmt_bytes(ul_total[winner])}\n")
+                  f"Sesión: DL {C.BOLD}{fmt_bytes(w['dl_total'])}{C.RESET}  "
+                  f"UL {fmt_bytes(w['ul_total'])}\n")
 
 
 if __name__ == "__main__":
     run_script(main)
-

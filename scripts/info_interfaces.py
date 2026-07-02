@@ -33,12 +33,7 @@ import argparse
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from lib import MikroTikAPI, load_config, fmt_speed, fmt_bytes, run_script
-
-
-def get_iface_stats(api) -> dict:
-    """Retorna dict nombre → stats del comando /interface/print stats."""
-    ifaces = api.command("/interface/print", params=["=stats="])
-    return {i["name"]: i for i in ifaces}
+from core.monitoreo import get_iface_stats, calcular_delta, interfaz_mas_activa
 
 
 def print_table(stats: dict, delta: dict = None, interval: float = None):
@@ -102,24 +97,12 @@ def main():
             time.sleep(args.interval)
             sample2 = get_iface_stats(api)
 
-            # Calcular delta de bytes
-            delta = {}
-            for name, s2 in sample2.items():
-                if name in sample1:
-                    s1 = sample1[name]
-                    delta[name] = {
-                        "tx-byte": max(0, int(s2.get("tx-byte", 0)) -
-                                          int(s1.get("tx-byte", 0))),
-                        "rx-byte": max(0, int(s2.get("rx-byte", 0)) -
-                                          int(s1.get("rx-byte", 0))),
-                    }
-
+            delta = calcular_delta(sample1, sample2)
             print_table(sample2, delta=delta, interval=args.interval)
 
             # Identificar interfaz más activa
-            if delta:
-                busiest = max(delta.items(),
-                              key=lambda kv: kv[1]["tx-byte"] + kv[1]["rx-byte"])
+            busiest = interfaz_mas_activa(delta)
+            if busiest:
                 bname, bd = busiest
                 tx_r = bd["tx-byte"] * 8 // args.interval
                 rx_r = bd["rx-byte"] * 8 // args.interval
