@@ -12,9 +12,9 @@ lee de config/qos.json — ver config/qos.json.example. Sin ese archivo se
 usan los valores por defecto del plan original (Kevin, 100 Mbps).
 
 Uso:
-    python3 scripts/10_deploy_qos.py               # desplegar
-    python3 scripts/10_deploy_qos.py --dry-run     # mostrar sin aplicar
-    python3 scripts/10_deploy_qos.py --rollback    # revertir todo
+    python3 scripts/qos_desplegar.py               # desplegar
+    python3 scripts/qos_desplegar.py --dry-run     # mostrar sin aplicar
+    python3 scripts/qos_desplegar.py --rollback    # revertir todo
 
 Pasos ejecutados:
     0. Verificación previa (interfaces, FastTrack, IPs)
@@ -745,7 +745,7 @@ def step_6_verify(api: MikroTikAPI, qos: dict):
     print("  2. Activar OBS en Kevin y verificar estabilidad del stream")
     print("  3. Hacer ping desde Kevin a servidor de juegos")
     print("  4. Monitorear en Winbox → Queues → Queue Tree")
-    print("  5. Si algo falla, ejecutar: scripts/10_deploy_qos.py --rollback")
+    print("  5. Si algo falla, ejecutar: scripts/qos_desplegar.py --rollback")
 
 
 def rollback(api: MikroTikAPI):

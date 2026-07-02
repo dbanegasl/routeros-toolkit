@@ -3,7 +3,7 @@
 Validar Router — Verificación previa de conectividad y configuración
 
 Uso:
-    python3 scripts/00_validate_router.py
+    python3 scripts/sys_validar.py
 """
 
 import sys
@@ -161,10 +161,10 @@ def main():
         
         if len(mangle) == 0 and len(queues) == 0 and len(simple) == 0:
             print("\n  📋 Estado: SIN QoS (listo para desplegar)")
-            print("  Próximo paso: python3 scripts/10_deploy_qos.py")
+            print("  Próximo paso: python3 scripts/qos_desplegar.py")
         else:
             print("\n  📋 Estado: CON QoS ACTIVO")
-            print("  Próximo paso: python3 scripts/12_monitor_qos.py")
+            print("  Próximo paso: python3 scripts/qos_monitor.py")
         
 
 

@@ -11,7 +11,7 @@ colas 'QoS_*/DL-*/UL-*'). Las reglas de otros gestores (bloqueos del
 script 06, horarios del script 09, reglas manuales) se preservan.
 
 Uso:
-    python3 scripts/13_reset_qos.py
+    python3 scripts/qos_reset.py
 """
 
 import sys
@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from lib import MikroTikAPI, load_config, print_header, run_script
 
-# Prefijos que identifican los elementos creados por 10_deploy_qos.py
+# Prefijos que identifican los elementos creados por qos_desplegar.py
 QOS_COMMENT_PREFIX = "QoS"
 QOS_QUEUE_PREFIXES = ("QoS_", "DL-", "UL-")
 
@@ -84,7 +84,7 @@ def main():
         print(f"  • {len(qos_trees)} colas Queue Tree del QoS")
         print(f"\n✓ Reglas de otros gestores (bloqueos, horarios) intactas")
         print(f"\nPróximo paso:")
-        print(f"  python3 scripts/10_deploy_qos.py")
+        print(f"  python3 scripts/qos_desplegar.py")
 
 
 

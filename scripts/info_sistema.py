@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-07_system_info.py — Información del sistema del router
+info_sistema.py — Información del sistema del router
 =======================================================
 
 Muestra un resumen del estado del hardware y software del router:
@@ -11,8 +11,8 @@ Muestra un resumen del estado del hardware y software del router:
     - Número de interfaces activas
 
 Uso:
-    python3 scripts/07_system_info.py
-    python3 scripts/07_system_info.py --watch   # refresca cada 3s (Ctrl+C para salir)
+    python3 scripts/info_sistema.py
+    python3 scripts/info_sistema.py --watch   # refresca cada 3s (Ctrl+C para salir)
 """
 
 import sys

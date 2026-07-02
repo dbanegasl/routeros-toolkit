@@ -21,7 +21,7 @@ Los scripts también respetan variables de entorno del sistema operativo (sobree
 
 ```bash
 export MIKROTIK_PASSWORD="otra_clave"
-python3 scripts/02_top_consumers.py
+python3 scripts/mon_consumo.py
 ```
 
 Orden de resolución de `load_config()`: ruta explícita → variable `MIKROTIK_ENV_FILE` → `config.env` en la raíz del proyecto → variables de entorno del sistema (prioridad máxima).
@@ -39,7 +39,7 @@ Opcionales: `MIKROTIK_TIMEOUT` (segundos de espera, default 15) y `MIKROTIK_LAN_
 python3 menu.py
 ```
 
-El **menú principal** tiene 7 categorías y 29 opciones. Selecciona con números y Enter. `Ctrl+C` en cualquier script devuelve al menú. Las opciones que modifican el router de forma inmediata (eliminar corte [21], desplegar QoS [23] y eliminar QoS [26]) piden confirmación explícita antes de ejecutarse.
+El **menú principal** tiene 7 categorías y 29 opciones. Selecciona con números y Enter. `Ctrl+C` en cualquier script devuelve al menú. El primer dígito indica la sección (1–9 Información, 10s Monitoreo, 20s Mantenimiento, 30s Identificación, 40s Horario, 50s QoS, 90s Sistema). Las opciones que modifican el router de forma inmediata (eliminar corte [43], desplegar QoS [51] y eliminar QoS [54]) piden confirmación explícita antes de ejecutarse.
 
 Todos los scripts funcionan también standalone desde la raíz del proyecto.
 
@@ -47,42 +47,42 @@ Todos los scripts funcionan también standalone desde la raíz del proyecto.
 
 ## 📖 Referencia de scripts
 
-### `00_validate_router.py` — Verificación previa
+### `sys_validar.py` — Verificación previa
 
 Chequeo completo antes de operar: identidad, interfaces, IPs, FastTrack, estado QoS y tráfico. Indica el próximo paso según lo que encuentre.
 
 ```bash
-python3 scripts/00_validate_router.py
+python3 scripts/sys_validar.py
 ```
 
 Sin flags. Solo lectura.
 
 ---
 
-### `01_list_devices.py` — Inventario de dispositivos
+### `info_dispositivos.py` — Inventario de dispositivos
 
 Lista todos los dispositivos con IP asignada (DHCP o estática), su MAC, hostname, puerto físico del switch y fabricante.
 
 ```bash
-python3 scripts/01_list_devices.py
+python3 scripts/info_dispositivos.py
 
 # Buscar un dispositivo específico
-python3 scripts/01_list_devices.py | grep -i samsung
-python3 scripts/01_list_devices.py | grep ether5
+python3 scripts/info_dispositivos.py | grep -i samsung
+python3 scripts/info_dispositivos.py | grep ether5
 ```
 
 Sin flags. Solo lectura.
 
 ---
 
-### `02_top_consumers.py` — Top consumidores (snapshot)
+### `mon_consumo.py` — Top consumidores (snapshot)
 
 Analiza las conexiones activas (connection tracking) y muestra qué dispositivo usa más internet en este momento. Una sola consulta, resultado inmediato.
 
 ```bash
-python3 scripts/02_top_consumers.py
-python3 scripts/02_top_consumers.py --top 10
-python3 scripts/02_top_consumers.py --sort total    # por GB acumulados
+python3 scripts/mon_consumo.py
+python3 scripts/mon_consumo.py --top 10
+python3 scripts/mon_consumo.py --sort total    # por GB acumulados
 ```
 
 | Flag | Descripción | Default |
@@ -93,14 +93,14 @@ python3 scripts/02_top_consumers.py --sort total    # por GB acumulados
 
 ---
 
-### `03_live_monitor.py` — Monitor en vivo
+### `mon_vivo.py` — Monitor en vivo
 
 Dashboard que se refresca automáticamente. Muestra velocidad en tiempo real de cada dispositivo. `Ctrl+C` para salir.
 
 ```bash
-python3 scripts/03_live_monitor.py                # refresca cada 3s
-python3 scripts/03_live_monitor.py --interval 5   # cada 5 segundos
-python3 scripts/03_live_monitor.py --top 10
+python3 scripts/mon_vivo.py                # refresca cada 3s
+python3 scripts/mon_vivo.py --interval 5   # cada 5 segundos
+python3 scripts/mon_vivo.py --top 10
 ```
 
 | Flag | Descripción | Default |
@@ -110,14 +110,14 @@ python3 scripts/03_live_monitor.py --top 10
 
 ---
 
-### `04_interface_stats.py` — Estadísticas por interfaz
+### `info_interfaces.py` — Estadísticas por interfaz
 
 Tráfico total y velocidad actual de cada interfaz física. Útil para identificar qué puerto del router está saturado.
 
 ```bash
-python3 scripts/04_interface_stats.py               # snapshot
-python3 scripts/04_interface_stats.py --watch       # mide velocidad real
-python3 scripts/04_interface_stats.py --watch --interval 10
+python3 scripts/info_interfaces.py               # snapshot
+python3 scripts/info_interfaces.py --watch       # mide velocidad real
+python3 scripts/info_interfaces.py --watch --interval 10
 ```
 
 | Flag | Descripción | Default |
@@ -127,15 +127,15 @@ python3 scripts/04_interface_stats.py --watch --interval 10
 
 ---
 
-### `05_router_log.py` — Log del router
+### `mant_log.py` — Log del router
 
 Muestra el syslog de RouterOS con colores por nivel (error rojo, warning amarillo, info normal, debug gris).
 
 ```bash
-python3 scripts/05_router_log.py                # últimas 50 líneas
-python3 scripts/05_router_log.py --lines 100
-python3 scripts/05_router_log.py --follow       # modo follow (Ctrl+C para salir)
-python3 scripts/05_router_log.py --filter dhcp  # filtrar por texto
+python3 scripts/mant_log.py                # últimas 50 líneas
+python3 scripts/mant_log.py --lines 100
+python3 scripts/mant_log.py --follow       # modo follow (Ctrl+C para salir)
+python3 scripts/mant_log.py --filter dhcp  # filtrar por texto
 ```
 
 | Flag | Descripción | Default |
@@ -146,15 +146,15 @@ python3 scripts/05_router_log.py --filter dhcp  # filtrar por texto
 
 ---
 
-### `06_block_ip.py` — Bloquear / desbloquear IPs ⚠️ modifica firewall
+### `mant_bloqueo.py` — Bloquear / desbloquear IPs ⚠️ modifica firewall
 
 Agrega o quita reglas `drop` en la cadena FORWARD. Solo gestiona sus propias reglas (comentario `BLOQUEADO-POR-MENU-<IP>`), nunca toca reglas ajenas.
 
 ```bash
-python3 scripts/06_block_ip.py                    # modo interactivo con confirmación
-python3 scripts/06_block_ip.py --block 192.168.5.22
-python3 scripts/06_block_ip.py --unblock 192.168.5.22
-python3 scripts/06_block_ip.py --list
+python3 scripts/mant_bloqueo.py                    # modo interactivo con confirmación
+python3 scripts/mant_bloqueo.py --block 192.168.5.22
+python3 scripts/mant_bloqueo.py --unblock 192.168.5.22
+python3 scripts/mant_bloqueo.py --list
 ```
 
 | Flag | Descripción |
@@ -165,13 +165,13 @@ python3 scripts/06_block_ip.py --list
 
 ---
 
-### `07_system_info.py` — Información del sistema
+### `info_sistema.py` — Información del sistema
 
 Modelo, versión de RouterOS, uptime, CPU, RAM, temperatura (si el hardware la reporta), disco e interfaces activas.
 
 ```bash
-python3 scripts/07_system_info.py
-python3 scripts/07_system_info.py --watch   # refresca cada 3s
+python3 scripts/info_sistema.py
+python3 scripts/info_sistema.py --watch   # refresca cada 3s
 ```
 
 | Flag | Descripción | Default |
@@ -180,16 +180,16 @@ python3 scripts/07_system_info.py --watch   # refresca cada 3s
 
 ---
 
-### `08_scan_devices.py` — Identificación avanzada de dispositivos
+### `scan_dispositivos.py` — Identificación avanzada de dispositivos
 
 Combina DHCP, ARP y (opcionalmente) macvendors.com para clasificar cada dispositivo: Apple, móvil, IoT, MAC privada/aleatoria, etc. Los resultados online se guardan en `lib/oui_cache.json` para no repetir consultas.
 
 ```bash
-python3 scripts/08_scan_devices.py                  # solo base OUI local
-python3 scripts/08_scan_devices.py --lookup         # consulta macvendors.com (~1 req/s)
-python3 scripts/08_scan_devices.py --filter apple
-python3 scripts/08_scan_devices.py --filter mobile
-python3 scripts/08_scan_devices.py --filter unknown
+python3 scripts/scan_dispositivos.py                  # solo base OUI local
+python3 scripts/scan_dispositivos.py --lookup         # consulta macvendors.com (~1 req/s)
+python3 scripts/scan_dispositivos.py --filter apple
+python3 scripts/scan_dispositivos.py --filter mobile
+python3 scripts/scan_dispositivos.py --filter unknown
 ```
 
 | Flag | Descripción |
@@ -199,17 +199,17 @@ python3 scripts/08_scan_devices.py --filter unknown
 
 ---
 
-### `09_schedule_internet.py` — Corte de internet por horario ⚠️ modifica firewall
+### `horario_internet.py` — Corte de internet por horario ⚠️ modifica firewall
 
 Bloquea internet a **todos** los dispositivos en un horario definido, excepto los de la lista blanca (reglas ACCEPT por MAC). Los nuevos dispositivos quedan bloqueados por defecto. Solo gestiona sus propias reglas (comentarios `HORARIO-INTERNET` y `HORARIO-PERMITIDO`). Requiere hora correcta en el router (NTP).
 
 **Persistencia:** la lista blanca se guarda en `config/whitelist.json` y **sobrevive a `--remove`** — al programar un nuevo corte se reaplica automáticamente. `--list` detecta desincronización entre el archivo y las reglas del router.
 
 ```bash
-python3 scripts/09_schedule_internet.py            # configurar horario (interactivo)
-python3 scripts/09_schedule_internet.py --list     # ver estado y lista blanca
-python3 scripts/09_schedule_internet.py --allow    # gestionar lista blanca
-python3 scripts/09_schedule_internet.py --remove   # eliminar todas las reglas
+python3 scripts/horario_internet.py            # configurar horario (interactivo)
+python3 scripts/horario_internet.py --list     # ver estado y lista blanca
+python3 scripts/horario_internet.py --allow    # gestionar lista blanca
+python3 scripts/horario_internet.py --remove   # eliminar todas las reglas
 ```
 
 | Flag | Descripción |
@@ -222,14 +222,14 @@ python3 scripts/09_schedule_internet.py --remove   # eliminar todas las reglas
 
 ---
 
-### `14_backup.py` — Respaldo de configuración
+### `mant_respaldo.py` — Respaldo de configuración
 
 Snapshot local en JSON (en `backups/`, gitignored) de todas las secciones que el toolkit puede modificar: firewall filter/mangle/nat, colas, leases DHCP, schedulers y direcciones IP, con metadatos del router. El modo por defecto y `--list` son de **solo lectura**. Úsalo antes de desplegar QoS o tocar firewall.
 
 ```bash
-python3 scripts/14_backup.py             # snapshot local (solo lectura)
-python3 scripts/14_backup.py --full      # + .backup completo EN el router
-python3 scripts/14_backup.py --list      # ver respaldos locales y del router
+python3 scripts/mant_respaldo.py             # snapshot local (solo lectura)
+python3 scripts/mant_respaldo.py --full      # + .backup completo EN el router
+python3 scripts/mant_respaldo.py --list      # ver respaldos locales y del router
 ```
 
 | Flag | Descripción |
@@ -242,21 +242,21 @@ El directorio local es `backups/` (override: `MIKROTIK_BACKUP_DIR`).
 
 ---
 
-### `10–13` — Suite QoS ⚠️ modifica mangle, colas y FastTrack
+### Suite QoS (`qos_*.py`) ⚠️ modifica mangle, colas y FastTrack
 
 Despliegue, diagnóstico, monitoreo y reset de QoS (Mangle + Queue Tree). La configuración (dispositivo prioritario, interfaces WAN/bridge, ancho de banda total, umbral bulk) vive en **`config/qos.json`** (plantilla: `config/qos.json.example`); sin archivo se usan los valores del plan original. Documentación dedicada:
 
 - [`scripts/README_QOS.md`](scripts/README_QOS.md) — visión general y flujo típico
-- [`scripts/10_USAGE.md`](scripts/10_USAGE.md) — manual completo con troubleshooting
-- [`scripts/10_QUICK_REFERENCE.md`](scripts/10_QUICK_REFERENCE.md) — referencia rápida
+- [`scripts/QOS_USAGE.md`](scripts/QOS_USAGE.md) — manual completo con troubleshooting
+- [`scripts/QOS_QUICK_REFERENCE.md`](scripts/QOS_QUICK_REFERENCE.md) — referencia rápida
 
 ```bash
-python3 scripts/10_deploy_qos.py              # desplegar
-python3 scripts/10_deploy_qos.py --dry-run    # mostrar reglas SIN tocar el router
-python3 scripts/10_deploy_qos.py --rollback   # revertir
-python3 scripts/11_diagnose_qos.py            # verificar marcado de tráfico
-python3 scripts/12_monitor_qos.py             # monitor por categoría (5s)
-python3 scripts/13_reset_qos.py               # borrar SOLO lo del QoS (reglas 'QoS *', colas QoS_*/DL-*/UL-*)
+python3 scripts/qos_desplegar.py              # desplegar
+python3 scripts/qos_desplegar.py --dry-run    # mostrar reglas SIN tocar el router
+python3 scripts/qos_desplegar.py --rollback   # revertir
+python3 scripts/qos_diagnostico.py            # verificar marcado de tráfico
+python3 scripts/qos_monitor.py             # monitor por categoría (5s)
+python3 scripts/qos_reset.py               # borrar SOLO lo del QoS (reglas 'QoS *', colas QoS_*/DL-*/UL-*)
 ```
 
 ---
@@ -352,4 +352,4 @@ Los scripts de bandwidth usan el comando `/ip/firewall/connection/print`. Campos
 - Python 3.6+
 - Sin dependencias externas (solo librería estándar)
 - Acceso de red al router en puerto 8728
-- Usuario con permisos de lectura en RouterOS (rol `read` es suficiente para los scripts de monitoreo; los scripts 06, 09, 10 y 13 requieren permisos de escritura)
+- Usuario con permisos de lectura en RouterOS (rol `read` es suficiente para los scripts de monitoreo; `mant_bloqueo`, `horario_internet`, `qos_desplegar` y `qos_reset` requieren permisos de escritura)

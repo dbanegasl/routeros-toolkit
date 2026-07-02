@@ -7,7 +7,7 @@ Monitorea el tráfico por categoría (Kevin, Trabajo, Streaming, etc)
 en tiempo real mientras se está usando la red.
 
 Uso:
-    python3 scripts/12_monitor_qos.py
+    python3 scripts/qos_monitor.py
 """
 
 import sys

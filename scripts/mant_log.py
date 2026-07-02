@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-05_router_log.py — Ver el log del router MikroTik
+mant_log.py — Ver el log del router MikroTik
 ==================================================
 
 Muestra las entradas del syslog de RouterOS con colores por nivel:
@@ -10,10 +10,10 @@ Muestra las entradas del syslog de RouterOS con colores por nivel:
     ⚪ debug            — gris
 
 Uso:
-    python3 scripts/05_router_log.py              # últimas 50 líneas
-    python3 scripts/05_router_log.py --lines 100  # últimas 100 líneas
-    python3 scripts/05_router_log.py --follow      # modo follow (Ctrl+C para salir)
-    python3 scripts/05_router_log.py --filter dhcp # filtrar por texto
+    python3 scripts/mant_log.py              # últimas 50 líneas
+    python3 scripts/mant_log.py --lines 100  # últimas 100 líneas
+    python3 scripts/mant_log.py --follow      # modo follow (Ctrl+C para salir)
+    python3 scripts/mant_log.py --filter dhcp # filtrar por texto
 """
 
 import sys

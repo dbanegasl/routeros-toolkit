@@ -1,20 +1,20 @@
 # QoS Scripts — MikroTik RouterOS v6.49.19
 
 > 💡 Toda la suite está disponible también desde el **menú interactivo**
-> (`python3 menu.py`, sección "🚦 CALIDAD DE SERVICIO"): dry-run [22],
-> desplegar [23], diagnosticar [24], monitor [25] y reset [26]. Las
-> opciones que modifican el router (23 y 26) piden confirmación.
+> (`python3 menu.py`, sección "🚦 CALIDAD DE SERVICIO"): dry-run [50],
+> desplegar [51], diagnosticar [52], monitor [53] y reset [54]. Las
+> opciones que modifican el router (51 y 54) piden confirmación.
 
 ## 📋 Scripts disponibles
 
-### 1. **10_deploy_qos.py** — DESPLEGAR QoS
+### 1. **qos_desplegar.py** — DESPLEGAR QoS
 Aplica la configuración completa de QoS (Mangle + Queue Tree). Los
 parámetros (dispositivo prioritario, interfaces, ancho de banda) se leen
 de `config/qos.json` (plantilla: `config/qos.json.example`).
 
 ```bash
-python3 scripts/10_deploy_qos.py             # desplegar
-python3 scripts/10_deploy_qos.py --dry-run   # ver qué haría SIN tocar el router
+python3 scripts/qos_desplegar.py             # desplegar
+python3 scripts/qos_desplegar.py --dry-run   # ver qué haría SIN tocar el router
 ```
 
 **Qué hace:**
@@ -33,11 +33,11 @@ python3 scripts/10_deploy_qos.py --dry-run   # ver qué haría SIN tocar el rout
 
 ---
 
-### 2. **11_diagnose_qos.py** — DIAGNOSTICAR QoS
+### 2. **qos_diagnostico.py** — DIAGNOSTICAR QoS
 Verifica si las reglas Mangle están funcionando correctamente.
 
 ```bash
-python3 scripts/11_diagnose_qos.py
+python3 scripts/qos_diagnostico.py
 ```
 
 **Qué muestra:**
@@ -48,11 +48,11 @@ python3 scripts/11_diagnose_qos.py
 
 ---
 
-### 3. **12_monitor_qos.py** — MONITOREAR EN TIEMPO REAL
+### 3. **qos_monitor.py** — MONITOREAR EN TIEMPO REAL
 Muestra en tiempo real cuánto ancho de banda usa cada categoría.
 
 ```bash
-python3 scripts/12_monitor_qos.py
+python3 scripts/qos_monitor.py
 ```
 
 **Qué muestra (cada 5 segundos):**
@@ -68,13 +68,13 @@ python3 scripts/12_monitor_qos.py
 
 ---
 
-### 4. **13_reset_qos.py** — ELIMINAR EL QoS
+### 4. **qos_reset.py** — ELIMINAR EL QoS
 Borra las reglas Mangle del QoS (comentario `QoS *`) y las colas
 `QoS_*`/`DL-*`/`UL-*`, y rehabilita FastTrack. **No toca** reglas de otros
-gestores (bloqueos del script 06, horarios del 09, reglas manuales).
+gestores (bloqueos de mant_bloqueo, horarios de horario_internet, reglas manuales).
 
 ```bash
-python3 scripts/13_reset_qos.py
+python3 scripts/qos_reset.py
 ```
 
 **Uso:**
@@ -88,16 +88,16 @@ python3 scripts/13_reset_qos.py
 
 ```
 1. Desplegar QoS
-   python3 scripts/10_deploy_qos.py
+   python3 scripts/qos_desplegar.py
 
 2. Diagnosticar si funciona
-   python3 scripts/11_diagnose_qos.py
+   python3 scripts/qos_diagnostico.py
 
 3. Monitorear en tiempo real (durante tests)
-   python3 scripts/12_monitor_qos.py
+   python3 scripts/qos_monitor.py
 
 4. Si algo sale mal, eliminar todo
-   python3 scripts/13_reset_qos.py
+   python3 scripts/qos_reset.py
    
 5. Volver a intentar desde paso 1
 ```

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-08_scan_devices.py — Identificación avanzada de dispositivos en la red
+scan_dispositivos.py — Identificación avanzada de dispositivos en la red
 ======================================================================
 
 Combina datos de DHCP, ARP y opcionalmente la API de macvendors.com para
@@ -14,11 +14,11 @@ Detecta:
   - Hostname DHCP, tiempo restante de lease, tipo de asignación
 
 Uso:
-    python3 scripts/08_scan_devices.py             # solo base local
-    python3 scripts/08_scan_devices.py --lookup    # consulta macvendors.com
-    python3 scripts/08_scan_devices.py --filter apple
-    python3 scripts/08_scan_devices.py --filter mobile
-    python3 scripts/08_scan_devices.py --filter unknown
+    python3 scripts/scan_dispositivos.py             # solo base local
+    python3 scripts/scan_dispositivos.py --lookup    # consulta macvendors.com
+    python3 scripts/scan_dispositivos.py --filter apple
+    python3 scripts/scan_dispositivos.py --filter mobile
+    python3 scripts/scan_dispositivos.py --filter unknown
 """
 
 import sys

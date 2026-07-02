@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-06_block_ip.py — Bloquear / Desbloquear una IP en el firewall
+mant_bloqueo.py — Bloquear / Desbloquear una IP en el firewall
 =============================================================
 
 Agrega o elimina una regla de bloqueo en /ip/firewall/filter.
@@ -12,10 +12,10 @@ Regla que crea:
     comment="BLOQUEADO-POR-MENU-<IP>"
 
 Uso:
-    python3 scripts/06_block_ip.py --block 192.168.5.22
-    python3 scripts/06_block_ip.py --unblock 192.168.5.22
-    python3 scripts/06_block_ip.py --list          # ver IPs bloqueadas
-    python3 scripts/06_block_ip.py                 # modo interactivo
+    python3 scripts/mant_bloqueo.py --block 192.168.5.22
+    python3 scripts/mant_bloqueo.py --unblock 192.168.5.22
+    python3 scripts/mant_bloqueo.py --list          # ver IPs bloqueadas
+    python3 scripts/mant_bloqueo.py                 # modo interactivo
 """
 
 import sys

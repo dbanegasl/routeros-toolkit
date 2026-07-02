@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-04_interface_stats.py — Estadísticas de tráfico por interfaz
+info_interfaces.py — Estadísticas de tráfico por interfaz
 =============================================================
 
 Muestra el tráfico acumulado y la velocidad actual de cada interfaz
@@ -21,9 +21,9 @@ Modo continuo (--watch):
 
 Uso:
     cd mikrotik/
-    python3 scripts/04_interface_stats.py               # instantáneo
-    python3 scripts/04_interface_stats.py --watch        # mide 5s
-    python3 scripts/04_interface_stats.py --watch --interval 10
+    python3 scripts/info_interfaces.py               # instantáneo
+    python3 scripts/info_interfaces.py --watch        # mide 5s
+    python3 scripts/info_interfaces.py --watch --interval 10
 """
 
 import sys

@@ -1,13 +1,13 @@
-# Quick Reference — 10_deploy_qos.py
+# Quick Reference — qos_desplegar.py
 
 ## 🚀 Uso rápido
 
 ```bash
 # Desplegar QoS
-python3 scripts/10_deploy_qos.py
+python3 scripts/qos_desplegar.py
 
 # Revertir (si algo falla)
-python3 scripts/10_deploy_qos.py --rollback
+python3 scripts/qos_desplegar.py --rollback
 ```
 
 ---
@@ -117,16 +117,16 @@ DL-8-Bulk           156234567   234567     42         ✓ Normal (alta prioridad
 
 ```bash
 # Revertir todo:
-python3 scripts/10_deploy_qos.py --rollback
+python3 scripts/qos_desplegar.py --rollback
 
 # Verificar interfaces:
-python3 scripts/01_list_devices.py
+python3 scripts/info_dispositivos.py
 
 # Verificar recursos:
-python3 scripts/07_system_info.py
+python3 scripts/info_sistema.py
 
 # Consultar documentación completa:
-cat scripts/10_USAGE.md
+cat scripts/QOS_USAGE.md
 ```
 
 ---

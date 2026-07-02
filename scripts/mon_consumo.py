@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-02_top_consumers.py — Top consumidores de ancho de banda
+mon_consumo.py — Top consumidores de ancho de banda
 =========================================================
 
 Analiza TODAS las conexiones activas del firewall (connection tracking)
@@ -33,10 +33,10 @@ Colores:
 
 Uso:
     cd mikrotik/
-    python3 scripts/02_top_consumers.py
-    python3 scripts/02_top_consumers.py --top 10
-    python3 scripts/02_top_consumers.py --sort total    # por GB acumulados
-    python3 scripts/02_top_consumers.py --no-color      # sin colores ANSI
+    python3 scripts/mon_consumo.py
+    python3 scripts/mon_consumo.py --top 10
+    python3 scripts/mon_consumo.py --sort total    # por GB acumulados
+    python3 scripts/mon_consumo.py --no-color      # sin colores ANSI
 """
 
 import sys

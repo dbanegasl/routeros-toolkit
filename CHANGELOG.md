@@ -7,6 +7,39 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Cambiado (reorganización 2026-07-02)
+- **Scripts renombrados por sección** (prefijo = grupo de acción; ya no
+  empiezan con número, lo que además los hace importables como módulos
+  Python — preparación para un futuro frontend). Renombrados con `git mv`
+  (el historial de cada archivo se conserva):
+
+  | Antes | Ahora |
+  |-------|-------|
+  | `00_validate_router.py` | `sys_validar.py` |
+  | `01_list_devices.py` | `info_dispositivos.py` |
+  | `02_top_consumers.py` | `mon_consumo.py` |
+  | `03_live_monitor.py` | `mon_vivo.py` |
+  | `04_interface_stats.py` | `info_interfaces.py` |
+  | `05_router_log.py` | `mant_log.py` |
+  | `06_block_ip.py` | `mant_bloqueo.py` |
+  | `07_system_info.py` | `info_sistema.py` |
+  | `08_scan_devices.py` | `scan_dispositivos.py` |
+  | `09_schedule_internet.py` | `horario_internet.py` |
+  | `10_deploy_qos.py` | `qos_desplegar.py` |
+  | `11_diagnose_qos.py` | `qos_diagnostico.py` |
+  | `12_monitor_qos.py` | `qos_monitor.py` |
+  | `13_reset_qos.py` | `qos_reset.py` |
+  | `14_backup.py` | `mant_respaldo.py` |
+  | `scripts/10_USAGE.md` | `scripts/QOS_USAGE.md` |
+  | `scripts/10_QUICK_REFERENCE.md` | `scripts/QOS_QUICK_REFERENCE.md` |
+
+- **Menú renumerado por décadas** — el primer dígito indica la sección:
+  1–9 Información · 10–19 Monitoreo · 20–29 Mantenimiento ·
+  30–39 Identificación · 40–49 Horario de internet · 50–59 QoS ·
+  90–99 Sistema. Agregar opciones nuevas ya no desordena la numeración.
+  Las confirmaciones quedaron en [43] eliminar corte, [51] desplegar QoS
+  y [54] reset QoS.
+
 ### Añadido (arreglos rápidos 2026-07-02)
 - **`14_backup.py`** — respaldo de configuración: snapshot JSON local de las
   secciones que el toolkit puede modificar (firewall, mangle, nat, colas,
