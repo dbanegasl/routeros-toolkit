@@ -1,0 +1,13 @@
+{
+  "_comentario": "Configuración del despliegue QoS (scripts 10-13). Copia este archivo como qos.json y ajusta los valores. qos.json está en .gitignore.",
+  "dispositivo_prioritario": {
+    "nombre": "Kevin KUTOGG",
+    "mac": "AA:BB:CC:DD:EE:FF",
+    "ip": "192.168.5.22"
+  },
+  "interfaz_wan": "ether1",
+  "bridge_lan": "bridge1",
+  "descarga_total_mbps": 100,
+  "subida_total_mbps": 100,
+  "umbral_bulk_mb": 30
+}

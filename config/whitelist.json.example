@@ -1,0 +1,10 @@
+{
+  "_comentario": "Lista blanca persistente del corte de internet (script 09). Se gestiona automáticamente con --allow; este ejemplo muestra el formato. whitelist.json está en .gitignore.",
+  "dispositivos": [
+    {
+      "mac": "AA:BB:CC:DD:EE:FF",
+      "nombre": "Cámara sala",
+      "agregado": "2026-07-02"
+    }
+  ]
+}

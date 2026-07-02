@@ -11,6 +11,13 @@ config.env
 !*.env.example        # sí trackear los archivos de ejemplo
 
 # ──────────────────────────────────────────
+# ⚙️ Configuración local (config/*.json)
+#    Solo se versionan las plantillas .example
+# ──────────────────────────────────────────
+config/*.json
+!config/*.json.example
+
+# ──────────────────────────────────────────
 # 🐍 Python cache
 # ──────────────────────────────────────────
 __pycache__/
@@ -50,3 +57,9 @@ desktop.ini
 # ──────────────────────────────────────────
 *.log
 logs/
+
+# ──────────────────────────────────────────
+# 📁 Otros archivos a ignora
+# ──────────────────────────────────────────
+
+temp/
