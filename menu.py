@@ -115,6 +115,26 @@ MENU = {
              "Borra todas las reglas — internet libre para todos"),
         ],
     },
+    "qos": {
+        "title": "🚦  CALIDAD DE SERVICIO (QoS)",
+        "items": [
+            ("22", "Ver plan QoS (dry-run)",
+             "10_deploy_qos.py", "--dry-run",
+             "Muestra cada regla y cola que se crearía — NO toca el router"),
+            ("23", "Desplegar QoS",
+             "10_deploy_qos.py", "",
+             "Aplica 23 reglas Mangle + 16 colas — pide confirmación"),
+            ("24", "Diagnosticar QoS",
+             "11_diagnose_qos.py", "",
+             "Verifica si las reglas están marcando tráfico (solo lectura)"),
+            ("25", "Monitor QoS en tiempo real",
+             "12_monitor_qos.py", "",
+             "Ancho de banda por categoría  ─  Ctrl+C para volver"),
+            ("26", "Eliminar QoS (reset)",
+             "13_reset_qos.py", "",
+             "Borra solo los elementos QoS del router — pide confirmación"),
+        ],
+    },
     "system": {
         "title": "⚙️   SISTEMA",
         "items": [
@@ -124,8 +144,18 @@ MENU = {
             ("13", "Ver configuración actual",
              None, "",
              "Muestra el contenido de config.env (sin la contraseña)"),
+            ("27", "Validación completa del router",
+             "00_validate_router.py", "",
+             "Chequeo previo: interfaces, IPs, FastTrack y estado QoS"),
         ],
     },
+}
+
+# Opciones que modifican el router de forma inmediata al lanzarse (el script
+# no vuelve a preguntar): el menú exige confirmación explícita antes.
+CONFIRMAR = {
+    "23": "Esto desplegará el plan QoS completo (Mangle + Queue Tree) y deshabilitará FastTrack.",
+    "26": "Esto eliminará todas las reglas y colas QoS del router y rehabilitará FastTrack.",
 }
 
 
@@ -139,6 +169,17 @@ def clear():
 
 def pause():
     input(f"\n  {C.DIM}Presiona Enter para volver al menú...{C.RESET}")
+
+
+def confirmar(mensaje: str) -> bool:
+    """Pide confirmación explícita antes de una acción que modifica el router."""
+    print(f"\n  {C.WARN}⚠️  {mensaje}{C.RESET}")
+    try:
+        resp = input(f"  ¿Continuar? (s/N): ").strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return False
+    return resp in ("s", "si", "sí")
 
 
 def run_script(script: str, args: str = ""):
@@ -249,6 +290,10 @@ def main():
             pause()
 
         elif opcion in lookup:
+            if opcion in CONFIRMAR and not confirmar(CONFIRMAR[opcion]):
+                print(f"  {C.DIM}Cancelado — no se hizo ningún cambio.{C.RESET}")
+                time.sleep(1)
+                continue
             script, args = lookup[opcion]
             run_script(script, args)
             pause()

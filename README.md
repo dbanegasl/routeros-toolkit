@@ -59,7 +59,7 @@ Las variables de entorno del sistema (`MIKROTIK_HOST`, `MIKROTIK_PORT`, `MIKROTI
 ### 3. Ejecutar
 
 ```bash
-python3 menu.py                          # menú interactivo (21 opciones)
+python3 menu.py                          # menú interactivo (27 opciones)
 python3 scripts/01_list_devices.py       # o cualquier script standalone
 ```
 

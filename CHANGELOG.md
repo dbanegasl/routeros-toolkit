@@ -5,6 +5,17 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/)
 y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### Añadido
+- **Suite QoS en el menú interactivo**: nueva sección "🚦 CALIDAD DE SERVICIO"
+  con dry-run [22], desplegar [23], diagnosticar [24], monitor [25] y
+  reset [26]; y validación completa del router [27] en SISTEMA (27 opciones).
+- **Confirmación explícita en el menú** (dict `CONFIRMAR`) antes de lanzar
+  opciones que modifican el router de inmediato (desplegar y reset QoS).
+- `tests/test_menu.py`: integridad del menú — claves únicas, scripts
+  existentes y que los mutadores inmediatos pidan confirmación (93 tests).
+
 ## [1.1.0] — 2026-07-02
 
 Gran ola de mejoras en 5 fases: tests, consolidación DRY, configuración externa,
