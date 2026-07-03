@@ -264,6 +264,16 @@ class MikroTikAPI:
                 current = {}
             elif tag == "!trap":
                 error = " | ".join(words[1:])
+                # RouterOS envía !done después del !trap: drenarlo antes de
+                # lanzar, o quedaría pendiente en el socket y el SIGUIENTE
+                # comando de una conexión reutilizada leería datos ajenos.
+                try:
+                    while True:
+                        resto = self._recv_sentence()
+                        if not resto or resto[0] in ("!done", "!fatal"):
+                            break
+                except Exception:
+                    pass    # mejor esfuerzo: el error original es el !trap
                 raise MikroTikCommandError(f"RouterOS error: {error}")
             elif tag == "!fatal":
                 raise MikroTikCommandError(f"RouterOS fatal: {words}")

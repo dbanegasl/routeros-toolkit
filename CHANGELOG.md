@@ -26,6 +26,26 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
   estado que verifica la **reaplicación automática de la lista blanca**
   (el pendiente histórico), orden ACCEPT→DROP, preservación de reglas
   ajenas, validaciones de IP/hora/días/MAC. Backend: 53 tests.
+- **Verificado contra el router real** (2026-07-02, acordado con
+  Daniel): bloqueo/desbloqueo de una IP de prueba y el ciclo eliminar →
+  reprogramar del corte real (01:01→06:01), con la whitelist de 18
+  dispositivos reaplicada automáticamente desde config/whitelist.json.
+
+### Corregido (Fase 4)
+- **`lib`: un `!trap` dejaba el `!done` sin leer en el socket** — con
+  conexiones reutilizadas (el backend web), el siguiente comando leía
+  la respuesta desfasada y devolvía datos truncados (p. ej. el corte
+  aparecía intermitentemente como inexistente). Ahora `command()` drena
+  hasta `!done` antes de lanzar `MikroTikCommandError`; test de
+  protocolo nuevo lo pinea. En el CLI nunca se manifestó (una conexión
+  por script).
+- **`core/horario.get_wan_interface` no detectaba la WAN en RouterOS
+  v6** cuando la ruta default tiene gateway IP: la interfaz viene
+  dentro de `gateway-status` ("… reachable via ether1") y no en un
+  campo `interface`. Ahora se parsea de ahí (4 tests nuevos). Este bug
+  también afectaba al CLI (`horario_internet.py` pedía la WAN a mano).
+- Un `HTTPException` de validación ya no resetea la conexión
+  persistente del backend.
 
 ### Agregado (Fase 3 del plan de frontend — 2026-07-02)
 - **WebSockets con muestreo compartido** (`backend/app/ws.py`):

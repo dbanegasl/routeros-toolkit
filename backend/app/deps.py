@@ -20,7 +20,12 @@ from pathlib import Path
 # Repo raíz en sys.path: el backend importa lib/ y core/ igual que los scripts
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
+from fastapi import HTTPException
+
 from lib import MikroTikAPI, MikroTikCommandError, load_config  # noqa: E402
+
+# Excepciones que NO indican conexión rota: la dejan viva.
+_EXCEPCIONES_INOCUAS = (MikroTikCommandError, HTTPException)
 
 _router_lock = threading.Lock()
 _api_compartida: MikroTikAPI | None = None
@@ -91,9 +96,9 @@ def get_api():
         try:
             yield api
             _ultimo_uso = time.time()
-        except (MikroTikCommandError, GeneratorExit):
-            # Un !trap no rompe la conexión; GeneratorExit es teardown
-            # normal del generador — en ambos casos sigue viva.
+        except (*_EXCEPCIONES_INOCUAS, GeneratorExit):
+            # Un !trap o un HTTPException (validación) no rompen la
+            # conexión; GeneratorExit es teardown normal del generador.
             _ultimo_uso = time.time()
             raise
         except BaseException:
@@ -115,7 +120,7 @@ def usar_api(func):
             resultado = func(api)
             _ultimo_uso = time.time()
             return resultado
-        except MikroTikCommandError:
+        except _EXCEPCIONES_INOCUAS:
             _ultimo_uso = time.time()
             raise
         except BaseException:

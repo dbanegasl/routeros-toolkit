@@ -129,3 +129,39 @@ class TestCorteEnCurso(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestGetWanInterface(unittest.TestCase):
+    """La ruta default de RouterOS v6 puede no traer 'interface': la
+    interfaz real viene en gateway-status ('... reachable via  ether1')."""
+
+    class _API:
+        def __init__(self, rutas):
+            self.rutas = rutas
+
+        def command(self, cmd, params=None, queries=None):
+            return self.rutas
+
+    def test_interface_directa(self):
+        api = self._API([{"dst-address": "0.0.0.0/0", "active": "true",
+                          "interface": "ether1"}])
+        self.assertEqual(schedule.get_wan_interface(api), "ether1")
+
+    def test_via_gateway_status(self):
+        api = self._API([{"dst-address": "0.0.0.0/0", "active": "true",
+                          "gateway": "172.10.7.1",
+                          "gateway-status": "172.10.7.1 reachable via  ether1"}])
+        self.assertEqual(schedule.get_wan_interface(api), "ether1")
+
+    def test_prefiere_la_activa(self):
+        api = self._API([
+            {"dst-address": "0.0.0.0/0", "active": "false",
+             "gateway-status": "backup reachable via  ether2"},
+            {"dst-address": "0.0.0.0/0", "active": "true",
+             "gateway-status": "172.10.7.1 reachable via  ether1"},
+        ])
+        self.assertEqual(schedule.get_wan_interface(api), "ether1")
+
+    def test_sin_ruta_default(self):
+        api = self._API([{"dst-address": "192.168.5.0/24",
+                          "gateway": "bridge1"}])
+        self.assertEqual(schedule.get_wan_interface(api), "")
