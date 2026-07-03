@@ -13,7 +13,9 @@ const enlaces = [
   { a: "/dispositivos", texto: es.nav.dispositivos, icono: "📱" },
   { a: "/monitoreo", texto: es.nav.monitoreo, icono: "📈" },
   { a: "/horario", texto: es.nav.horario, icono: "⏰" },
+  { a: "/qos", texto: es.nav.qos, icono: "⚡" },
   { a: "/log", texto: es.nav.log, icono: "📜" },
+  { a: "/respaldos", texto: es.nav.respaldos, icono: "💾" },
 ];
 
 function clasesEnlace(activo: boolean): string {

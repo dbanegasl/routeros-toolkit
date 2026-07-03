@@ -18,7 +18,8 @@ from starlette.concurrency import run_in_threadpool
 from lib import MikroTikConnectionError, MikroTikCommandError
 from . import auth, ws
 from .deps import cerrar_api_compartida
-from .routers import bloqueos, dispositivos, horario, monitoreo, sistema
+from .routers import (bloqueos, dispositivos, horario, monitoreo, qos,
+                      respaldos, sistema)
 
 
 @asynccontextmanager
@@ -46,6 +47,8 @@ app.include_router(dispositivos.router)
 app.include_router(monitoreo.router)
 app.include_router(horario.router)
 app.include_router(bloqueos.router)
+app.include_router(qos.router)
+app.include_router(respaldos.router)
 app.include_router(ws.router)
 
 

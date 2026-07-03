@@ -18,6 +18,12 @@ const Log = lazy(() =>
 const Horario = lazy(() =>
   import("./pages/Horario").then((m) => ({ default: m.Horario })),
 );
+const QoS = lazy(() =>
+  import("./pages/QoS").then((m) => ({ default: m.QoS })),
+);
+const Respaldos = lazy(() =>
+  import("./pages/Respaldos").then((m) => ({ default: m.Respaldos })),
+);
 
 export default function App() {
   const sesion = useSesion();
@@ -48,7 +54,9 @@ export default function App() {
           <Route path="/dispositivos" element={<Dispositivos />} />
           <Route path="/monitoreo" element={<Monitoreo />} />
           <Route path="/horario" element={<Horario />} />
+          <Route path="/qos" element={<QoS />} />
           <Route path="/log" element={<Log />} />
+          <Route path="/respaldos" element={<Respaldos />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

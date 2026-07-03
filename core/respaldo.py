@@ -70,6 +70,28 @@ def save_snapshot(snapshot: dict) -> Path:
     return ruta
 
 
+def list_local_snapshots() -> list:
+    """Snapshots locales en backups/ (más antiguo primero, como el CLI).
+
+    Cada entrada: {"nombre", "bytes", "meta"} — meta es None si el JSON
+    no se pudo leer (corrupto o sin permisos).
+    """
+    backup_dir = get_backup_dir()
+    if not backup_dir.exists():
+        return []
+    snapshots = []
+    for ruta in sorted(backup_dir.glob("snapshot_*.json")):
+        item = {"nombre": ruta.name, "bytes": ruta.stat().st_size,
+                "meta": None}
+        try:
+            with open(ruta) as f:
+                item["meta"] = json.load(f).get("meta", {})
+        except (OSError, ValueError):
+            pass
+        snapshots.append(item)
+    return snapshots
+
+
 def create_router_backup(api) -> str:
     """Crea un .backup completo EN EL ROUTER y retorna su nombre."""
     nombre = f"respaldo-{datetime.now():%Y%m%d-%H%M%S}"

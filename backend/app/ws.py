@@ -20,6 +20,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from starlette.concurrency import run_in_threadpool
 
 from core.monitoreo import snapshot_consumo, obtener_log, nivel_log
+from core.qos import filtrar_colas_qos
 from lib import build_name_map, get_lan_prefix
 from .auth import _sesion_valida
 from .deps import usar_api
@@ -156,8 +157,37 @@ def _muestra_log(api) -> dict:
     }
 
 
+class _EstadoQos:
+    """Muestra anterior de cada cola QoS para calcular velocidad real."""
+    prev: dict = {}       # nombre de cola → (bytes, timestamp)
+
+
+def _muestra_qos(api) -> dict:
+    """Colas QoS con velocidad (bits/s) por delta entre muestras."""
+    ahora = time.time()
+    colas = []
+    for q in filtrar_colas_qos(api.command("/queue/tree/print")):
+        nombre = q.get("name", "")
+        total = int(q.get("bytes", 0))
+        previa = _EstadoQos.prev.get(nombre)
+        rate = 0.0
+        if previa and 0 < ahora - previa[1] < 60:
+            rate = max(0, total - previa[0]) * 8 / (ahora - previa[1])
+        _EstadoQos.prev[nombre] = (total, ahora)
+        colas.append({
+            "nombre": nombre,
+            "mark": q.get("packet-mark", ""),
+            "bytes": total,
+            "rate": round(rate),
+            "descartados": int(q.get("dropped", 0)),
+            "maximo": q.get("max-limit", ""),
+        })
+    return {"activo": bool(colas), "colas": colas}
+
+
 muestreador_monitor = Muestreador(_muestra_monitor)
 muestreador_log = Muestreador(_muestra_log)
+muestreador_qos = Muestreador(_muestra_qos)
 
 
 # ---------------------------------------------------------------------------
@@ -188,3 +218,8 @@ async def ws_monitor(ws: WebSocket):
 @router.websocket("/ws/log")
 async def ws_log(ws: WebSocket):
     await _atender(ws, muestreador_log)
+
+
+@router.websocket("/ws/qos")
+async def ws_qos(ws: WebSocket):
+    await _atender(ws, muestreador_qos)
