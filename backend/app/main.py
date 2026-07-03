@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from lib import MikroTikConnectionError, MikroTikCommandError
-from . import auth
+from . import auth, ws
 from .routers import dispositivos, horario, monitoreo, sistema
 
 app = FastAPI(
@@ -32,6 +32,7 @@ app.include_router(sistema.router)
 app.include_router(dispositivos.router)
 app.include_router(monitoreo.router)
 app.include_router(horario.router)
+app.include_router(ws.router)
 
 
 @app.exception_handler(MikroTikConnectionError)

@@ -7,6 +7,25 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Agregado (Fase 3 del plan de frontend — 2026-07-02)
+- **WebSockets con muestreo compartido** (`backend/app/ws.py`):
+  `/ws/monitor` (consumo por dispositivo + velocidad real por interfaz)
+  y `/ws/log` (syslog con niveles). Un solo bucle de muestreo por
+  stream sin importar cuántas pestañas estén conectadas — el primer
+  cliente lo arranca, el último lo detiene, todos reciben el mismo
+  snapshot; conexión persistente al router bajo el mismo candado global
+  (se reabre sola si falla). Sin sesión el socket se cierra con 4401.
+  Verificado en vivo: dos clientes simultáneos recibieron timestamps
+  idénticos (un solo muestreo al router).
+- **Página Monitoreo**: gráfica en vivo del tráfico total (↓/↑, paleta
+  validada para el tema oscuro con el validador de dataviz), tabla de
+  consumo por dispositivo y tabla de interfaces con velocidad real.
+- **Página Log**: visor en vivo del syslog con colores por nivel
+  (como `mant_log.py`), filtro de texto y auto-scroll (follow).
+- Hook `useWs` con reconexión automática (y vuelta al login si el
+  servidor responde 4401). Recharts con carga diferida: el bundle
+  inicial se mantiene en ~72 KB gzip. Tests de backend: 30.
+
 ### Agregado (Fase 2 del plan de frontend — 2026-07-02)
 - **SPA React + Vite + TypeScript** (`frontend/src/`): login contra la
   API, **Inicio** (tarjetas: estado del router con CPU/RAM/disco, corte

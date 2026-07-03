@@ -11,6 +11,8 @@ import { es } from "../i18n/es";
 const enlaces = [
   { a: "/", texto: es.nav.dashboard, icono: "🏠" },
   { a: "/dispositivos", texto: es.nav.dispositivos, icono: "📱" },
+  { a: "/monitoreo", texto: es.nav.monitoreo, icono: "📈" },
+  { a: "/log", texto: es.nav.log, icono: "📜" },
 ];
 
 function clasesEnlace(activo: boolean): string {

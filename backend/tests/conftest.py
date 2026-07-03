@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from fastapi.testclient import TestClient      # noqa: E402
 
-from backend.app import auth                   # noqa: E402
+from backend.app import auth, ws as ws_mod     # noqa: E402
 from backend.app.deps import get_api           # noqa: E402
 from backend.app.main import app               # noqa: E402
 
@@ -30,11 +30,15 @@ class FakeAPI:
     def __init__(self, responses: dict = None):
         self.responses = responses or {}
         self.writes = []
+        self.cerrada = False
 
     def command(self, cmd, params=None, queries=None):
         if params:
             self.writes.append((cmd, params))
         return self.responses.get(cmd, [])
+
+    def close(self):
+        self.cerrada = True
 
 
 def make_fake_api():
@@ -89,21 +93,45 @@ def make_fake_api():
     })
 
 
+def _reset_ws():
+    """Estado limpio de los muestreadores WS entre tests."""
+    for m in (ws_mod.muestreador_monitor, ws_mod.muestreador_log):
+        m.clientes.clear()
+        m._api = None
+        m._tarea = None
+    ws_mod._EstadoMonitor.nombres = {}
+    ws_mod._EstadoMonitor.nombres_ts = 0.0
+    ws_mod._EstadoMonitor.ifaces_prev = {}
+    ws_mod._EstadoMonitor.ifaces_prev_ts = 0.0
+
+
 @pytest.fixture()
 def client(monkeypatch, tmp_path):
     """TestClient con FakeAPI inyectada, hash de prueba y estado limpio."""
     monkeypatch.setenv("APP_PASSWORD_HASH", auth.generar_hash(PASSWORD_TEST))
     # config/ vacío y aislado: sin qos.json ni whitelist.json reales
     monkeypatch.setenv("MIKROTIK_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setenv("APP_WS_INTERVALO", "0.05")
     auth.limpiar_estado()
+    _reset_ws()
 
     fake = make_fake_api()
     app.dependency_overrides[get_api] = lambda: fake
+    # El muestreo WS abre su propia conexión: darle la misma FakeAPI
+    conexiones = []
+
+    def crear_fake():
+        conexiones.append(1)
+        return fake
+
+    monkeypatch.setattr(ws_mod, "crear_api", crear_fake)
     with TestClient(app) as c:
         c.fake_api = fake
+        c.ws_conexiones = conexiones
         yield c
     app.dependency_overrides.clear()
     auth.limpiar_estado()
+    _reset_ws()
 
 
 @pytest.fixture()
