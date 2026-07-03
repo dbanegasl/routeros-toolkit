@@ -11,14 +11,16 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
-import { apiGet, apiPost, ApiError } from "./client";
+import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "./client";
 import type {
+  BloqueosResp,
   Consumo,
   DispositivosResp,
   Horario,
   Sesion,
   Sistema,
   Validacion,
+  WhitelistResp,
 } from "./types";
 
 /** Reintenta errores de red, pero nunca un 401/4xx. */
@@ -86,6 +88,70 @@ export const useConsumo = (top = 5) =>
   useQuery<Consumo>(
     lectura<Consumo>("consumo", `/api/consumo?top=${top}`, 15_000),
   );
+
+export const useBloqueos = () =>
+  useQuery<BloqueosResp>(
+    lectura<BloqueosResp>("bloqueos", "/api/bloqueos", 60_000),
+  );
+
+export const useWhitelist = () =>
+  useQuery<WhitelistResp>(
+    lectura<WhitelistResp>("whitelist", "/api/horario/whitelist"),
+  );
+
+/** Mutación de escritura ⚠️: siempre envía confirmar:true e invalida
+ *  las lecturas afectadas al terminar. */
+function escritura<TBody>(
+  ejecutar: (body: TBody) => Promise<{ mensaje: string }>,
+  invalidar: string[],
+) {
+  return () => {
+    const qc = useQueryClient();
+    return useMutation({
+      mutationFn: ejecutar,
+      onSuccess: () => {
+        for (const key of invalidar) {
+          void qc.invalidateQueries({ queryKey: [key] });
+        }
+      },
+    });
+  };
+}
+
+export const useBloquear = escritura(
+  (body: { ip: string }) =>
+    apiPost<{ mensaje: string }>("/api/bloqueos", { ...body, confirmar: true }),
+  ["bloqueos"],
+);
+
+export const useDesbloquear = escritura(
+  (body: { ip: string }) =>
+    apiDelete<{ mensaje: string }>(`/api/bloqueos/${body.ip}`, {
+      confirmar: true,
+    }),
+  ["bloqueos"],
+);
+
+export const useCrearHorario = escritura(
+  (body: { inicio: string; fin: string; dias: string[] }) =>
+    apiPost<{ mensaje: string }>("/api/horario", { ...body, confirmar: true }),
+  ["horario", "whitelist"],
+);
+
+export const useEliminarHorario = escritura(
+  (_body: Record<string, never>) =>
+    apiDelete<{ mensaje: string }>("/api/horario", { confirmar: true }),
+  ["horario", "whitelist"],
+);
+
+export const useGuardarWhitelist = escritura(
+  (body: { macs: string[] }) =>
+    apiPut<{ mensaje: string }>("/api/horario/whitelist", {
+      ...body,
+      confirmar: true,
+    }),
+  ["horario", "whitelist"],
+);
 
 /** ¿El error indica que la sesión expiró? */
 export function esSesionExpirada(error: unknown): boolean {

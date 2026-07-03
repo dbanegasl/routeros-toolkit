@@ -35,9 +35,13 @@ export async function apiGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+async function conCuerpo<T>(
+  method: "POST" | "PUT" | "DELETE",
+  path: string,
+  body?: unknown,
+): Promise<T> {
   const res = await fetch(path, {
-    method: "POST",
+    method,
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -45,3 +49,10 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   if (!res.ok) throw await parseError(res);
   return res.json() as Promise<T>;
 }
+
+export const apiPost = <T,>(path: string, body?: unknown) =>
+  conCuerpo<T>("POST", path, body);
+export const apiPut = <T,>(path: string, body?: unknown) =>
+  conCuerpo<T>("PUT", path, body);
+export const apiDelete = <T,>(path: string, body?: unknown) =>
+  conCuerpo<T>("DELETE", path, body);

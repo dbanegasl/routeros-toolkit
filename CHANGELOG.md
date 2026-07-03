@@ -7,6 +7,26 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Agregado (Fase 4 del plan de frontend — 2026-07-02)
+- **Primeras escrituras desde la web**, todas con doble salvaguarda:
+  el cuerpo `{"confirmar": true}` obligatorio en la API (sin él: 400 y
+  cero cambios) y diálogo de confirmación ⚠️ en la UI (espejo del dict
+  `CONFIRMAR` del menú CLI).
+- **Bloqueos**: `GET/POST /api/bloqueos`, `DELETE /api/bloqueos/{ip}` —
+  mismas reglas etiquetadas `BLOQUEADO-POR-MENU-*` del CLI, solo se
+  gestionan las propias. En la página Dispositivos: botón
+  Bloquear/Desbloquear por fila con badge 🚫.
+- **Horario de internet**: `POST /api/horario` (crear/reemplazar el
+  corte conservando la lista blanca), `DELETE /api/horario` (el archivo
+  whitelist.json persiste) y `GET/PUT /api/horario/whitelist`. Página
+  nueva **Horario**: estado del corte, editor de horario y días,
+  lista blanca con toggles (todos los dispositivos de la red + los
+  offline) y eliminación del corte.
+- Tests: ciclo completo crear → eliminar → reprogramar con FakeAPI con
+  estado que verifica la **reaplicación automática de la lista blanca**
+  (el pendiente histórico), orden ACCEPT→DROP, preservación de reglas
+  ajenas, validaciones de IP/hora/días/MAC. Backend: 53 tests.
+
 ### Agregado (Fase 3 del plan de frontend — 2026-07-02)
 - **WebSockets con muestreo compartido** (`backend/app/ws.py`):
   `/ws/monitor` (consumo por dispositivo + velocidad real por interfaz)

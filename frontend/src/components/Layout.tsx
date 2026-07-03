@@ -12,6 +12,7 @@ const enlaces = [
   { a: "/", texto: es.nav.dashboard, icono: "🏠" },
   { a: "/dispositivos", texto: es.nav.dispositivos, icono: "📱" },
   { a: "/monitoreo", texto: es.nav.monitoreo, icono: "📈" },
+  { a: "/horario", texto: es.nav.horario, icono: "⏰" },
   { a: "/log", texto: es.nav.log, icono: "📜" },
 ];
 
