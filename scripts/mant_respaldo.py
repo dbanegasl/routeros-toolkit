@@ -28,33 +28,30 @@ Uso:
 
 import sys
 import os
-import json
 import argparse
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from lib import (MikroTikAPI, load_config, print_header, fmt_bytes,
                  C, run_script)
 from core.respaldo import (get_backup_dir, build_snapshot, save_snapshot,
-                           create_router_backup, list_router_backups)
+                           create_router_backup, list_router_backups,
+                           list_local_snapshots)
 
 
 def do_list(api):
     """Muestra respaldos locales y del router."""
-    backup_dir = get_backup_dir()
-    locales = sorted(backup_dir.glob("snapshot_*.json")) if backup_dir.exists() else []
+    locales = list_local_snapshots()
 
-    print(f"  {C.BOLD}Snapshots locales{C.RESET} ({backup_dir}):")
+    print(f"  {C.BOLD}Snapshots locales{C.RESET} ({get_backup_dir()}):")
     if not locales:
         print(f"  {C.DIM}(ninguno — crea uno con: python3 scripts/mant_respaldo.py){C.RESET}")
-    for ruta in locales:
-        tam = fmt_bytes(ruta.stat().st_size)
-        try:
-            with open(ruta) as f:
-                meta = json.load(f).get("meta", {})
-            detalle = f"RouterOS {meta.get('routeros', '?')}"
-        except (OSError, ValueError):
+    for item in locales:
+        tam = fmt_bytes(item["bytes"])
+        if item["meta"] is None:
             detalle = f"{C.WARN}(no se pudo leer){C.RESET}"
-        print(f"  {C.GREEN}✓{C.RESET} {ruta.name:<34} {tam:>9}   {detalle}")
+        else:
+            detalle = f"RouterOS {item['meta'].get('routeros', '?')}"
+        print(f"  {C.GREEN}✓{C.RESET} {item['nombre']:<34} {tam:>9}   {detalle}")
 
     print(f"\n  {C.BOLD}Respaldos .backup en el router{C.RESET} (Files en Winbox):")
     router_files = list_router_backups(api)

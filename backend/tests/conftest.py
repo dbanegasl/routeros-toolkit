@@ -93,18 +93,26 @@ def make_fake_api():
         "/queue/tree/print": [],
         "/queue/simple/print": [],
         "/system/ntp/client/print": [{"enabled": "true"}],
+        "/file/print": [
+            {"name": "respaldo-20260701-120000.backup", "size": "12345",
+             "creation-time": "jul/01/2026 12:00:00"},
+            {"name": "otro-archivo.txt", "size": "10",
+             "creation-time": "jul/01/2026 12:00:00"},
+        ],
     })
 
 
 def _reset_ws():
     """Estado limpio de los muestreadores WS y la conexión compartida."""
-    for m in (ws_mod.muestreador_monitor, ws_mod.muestreador_log):
+    for m in (ws_mod.muestreador_monitor, ws_mod.muestreador_log,
+              ws_mod.muestreador_qos):
         m.clientes.clear()
         m._tarea = None
     ws_mod._EstadoMonitor.nombres = {}
     ws_mod._EstadoMonitor.nombres_ts = 0.0
     ws_mod._EstadoMonitor.ifaces_prev = {}
     ws_mod._EstadoMonitor.ifaces_prev_ts = 0.0
+    ws_mod._EstadoQos.prev = {}
     deps_mod._api_compartida = None
     deps_mod._ultimo_uso = 0.0
 

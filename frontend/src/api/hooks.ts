@@ -17,6 +17,10 @@ import type {
   Consumo,
   DispositivosResp,
   Horario,
+  QosDiagnostico,
+  QosPlan,
+  RespaldoCreado,
+  RespaldosResp,
   Sesion,
   Sistema,
   Validacion,
@@ -99,6 +103,31 @@ export const useWhitelist = () =>
     lectura<WhitelistResp>("whitelist", "/api/horario/whitelist"),
   );
 
+export const useQosPlan = () =>
+  useQuery<QosPlan>(lectura<QosPlan>("qosPlan", "/api/qos/plan"));
+
+export const useQosDiagnostico = (activo: boolean) =>
+  useQuery<QosDiagnostico>({
+    ...lectura<QosDiagnostico>("qosDiagnostico", "/api/qos/diagnostico", 15_000),
+    enabled: activo,
+  });
+
+export const useRespaldos = () =>
+  useQuery<RespaldosResp>(lectura<RespaldosResp>("respaldos", "/api/respaldos"));
+
+/** Crear respaldo — no exige confirmar: el snapshot es solo lectura y
+ *  el .backup (full) no altera la configuración del router. */
+export function useCrearRespaldo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { full: boolean }) =>
+      apiPost<RespaldoCreado>("/api/respaldos", body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["respaldos"] });
+    },
+  });
+}
+
 /** Mutación de escritura ⚠️: siempre envía confirmar:true e invalida
  *  las lecturas afectadas al terminar. */
 function escritura<TBody>(
@@ -151,6 +180,18 @@ export const useGuardarWhitelist = escritura(
       confirmar: true,
     }),
   ["horario", "whitelist"],
+);
+
+export const useDesplegarQos = escritura(
+  (_body: Record<string, never>) =>
+    apiPost<{ mensaje: string }>("/api/qos/desplegar", { confirmar: true }),
+  ["qosPlan", "qosDiagnostico", "validacion"],
+);
+
+export const useResetQos = escritura(
+  (_body: Record<string, never>) =>
+    apiDelete<{ mensaje: string }>("/api/qos", { confirmar: true }),
+  ["qosPlan", "qosDiagnostico", "validacion"],
 );
 
 /** ¿El error indica que la sesión expiró? */

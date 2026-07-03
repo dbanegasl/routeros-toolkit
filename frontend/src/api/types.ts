@@ -107,6 +107,91 @@ export interface WhitelistResp {
   dispositivos: WhitelistDispositivo[];
 }
 
+// ── QoS ──────────────────────────────────────────────────────────────
+
+export interface QosEstado {
+  activo: boolean;
+  mangle_qos: number;
+  mangle_ajenas: number;
+  colas_qos: number;
+  colas_ajenas: number;
+  fasttrack_activo: boolean;
+  fasttrack_reglas: number;
+}
+
+/** Reglas Mangle y colas del plan: dicts clave→valor de RouterOS. */
+export type ReglaRouterOS = Record<string, string>;
+
+export interface QosPlan {
+  config: {
+    dispositivo: { nombre: string; mac: string; ip: string };
+    interfaz_wan: string;
+    bridge_lan: string;
+    descarga_total_mbps: number;
+    subida_total_mbps: number;
+    umbral_bulk_mb: number;
+  };
+  lease: { existe: boolean; ip_actual: string | null };
+  estado: QosEstado;
+  mangle: ReglaRouterOS[];
+  colas: ReglaRouterOS[];
+}
+
+export interface QosMarca {
+  prioridad: string;
+  bytes: number;
+  paquetes: number;
+  reglas: { comentario: string; bytes: number; paquetes: number }[];
+}
+
+export interface QosColaDiag {
+  nombre: string;
+  padre: string;
+  mark: string;
+  bytes: number;
+  paquetes: number;
+  descartados: number;
+  limite: string;
+  maximo: string;
+}
+
+export interface QosDiagnostico {
+  estado: QosEstado;
+  marcas: QosMarca[];
+  colas: QosColaDiag[];
+}
+
+// ── Respaldos ────────────────────────────────────────────────────────
+
+export interface RespaldoLocal {
+  nombre: string;
+  bytes: number;
+  meta: {
+    creado?: string;
+    hora_router?: string | null;
+    routeros?: string;
+    equipo?: string;
+  } | null;
+}
+
+export interface RespaldoRouter {
+  nombre: string;
+  bytes: number;
+  creado: string;
+}
+
+export interface RespaldosResp {
+  locales: RespaldoLocal[];
+  router: RespaldoRouter[];
+}
+
+export interface RespaldoCreado {
+  mensaje: string;
+  snapshot: string;
+  secciones: Record<string, number>;
+  backup_router: string | null;
+}
+
 // ── Mensajes de WebSocket ────────────────────────────────────────────
 
 export interface InterfazViva {
@@ -137,4 +222,20 @@ export interface LogMsg {
   ts: number;
   error?: string;
   entradas: LogEntrada[];
+}
+
+export interface QosColaViva {
+  nombre: string;
+  mark: string;
+  bytes: number;
+  rate: number;
+  descartados: number;
+  maximo: string;
+}
+
+export interface QosMsg {
+  ts: number;
+  error?: string;
+  activo: boolean;
+  colas: QosColaViva[];
 }

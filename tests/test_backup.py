@@ -103,6 +103,38 @@ class TestSnapshot(unittest.TestCase):
         self.assertTrue(params[0].startswith("=name=respaldo-"))
 
 
+class TestListLocalSnapshots(unittest.TestCase):
+
+    def test_directorio_inexistente(self):
+        os.environ["MIKROTIK_BACKUP_DIR"] = "/ruta/que/no/existe"
+        try:
+            self.assertEqual(backup.list_local_snapshots(), [])
+        finally:
+            del os.environ["MIKROTIK_BACKUP_DIR"]
+
+    def test_lista_ordenada_con_meta_y_corruptos(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["MIKROTIK_BACKUP_DIR"] = tmp
+            try:
+                bueno = Path(tmp) / "snapshot_2026-07-01_090000.json"
+                bueno.write_text(json.dumps(
+                    {"meta": {"routeros": "6.49.19"}, "secciones": {}}))
+                roto = Path(tmp) / "snapshot_2026-07-02_100000.json"
+                roto.write_text("{esto no es json")
+                # Un archivo ajeno al patrón no aparece
+                (Path(tmp) / "notas.json").write_text("{}")
+
+                items = backup.list_local_snapshots()
+                self.assertEqual([i["nombre"] for i in items],
+                                 ["snapshot_2026-07-01_090000.json",
+                                  "snapshot_2026-07-02_100000.json"])
+                self.assertEqual(items[0]["meta"]["routeros"], "6.49.19")
+                self.assertGreater(items[0]["bytes"], 0)
+                self.assertIsNone(items[1]["meta"])   # corrupto → meta None
+            finally:
+                del os.environ["MIKROTIK_BACKUP_DIR"]
+
+
 class TestGetRouterDatetime(unittest.TestCase):
 
     def test_formato_v6(self):

@@ -14,6 +14,8 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     env_file: config.env              # credenciales del router (nunca en la imagen)
+    environment:
+      - TZ=${TZ:-UTC}                 # zona horaria: fechas de snapshots (ver .env)
     volumes:
       - ./config:/app/config          # qos.json, whitelist.json compartidos con el CLI
       - ./backups:/app/backups
