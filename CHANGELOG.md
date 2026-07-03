@@ -24,7 +24,15 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
   (como `mant_log.py`), filtro de texto y auto-scroll (follow).
 - Hook `useWs` con reconexión automática (y vuelta al login si el
   servidor responde 4401). Recharts con carga diferida: el bundle
-  inicial se mantiene en ~72 KB gzip. Tests de backend: 30.
+  inicial se mantiene en ~72 KB gzip.
+
+### Corregido (Fase 3)
+- El backend abría una conexión API por petición y RouterOS anota cada
+  login/logout: el polling del panel inundaba el syslog del router con
+  "user admin logged in/out via api". Ahora `get_api` reutiliza una
+  **conexión persistente** bajo el candado global (un !trap la deja
+  viva, un error de red la resetea, tras 60 s de ocio se verifica antes
+  de reutilizar, y el apagado hace logout limpio). Tests de backend: 35.
 
 ### Agregado (Fase 2 del plan de frontend — 2026-07-02)
 - **SPA React + Vite + TypeScript** (`frontend/src/`): login contra la
