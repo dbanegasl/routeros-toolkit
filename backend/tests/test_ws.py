@@ -63,6 +63,16 @@ class TestMuestreoCompartido:
         # crear_api se llamó exactamente una vez pese a 2 clientes y N ciclos
         assert session.ws_conexiones == [1]
 
+    def test_navegar_entre_paginas_no_reconecta(self, session):
+        """Entrar y salir de Monitoreo/Log repetidas veces reutiliza la
+        conexión compartida: cero logins extra en el syslog del router."""
+        for _ in range(3):
+            with session.websocket_connect("/ws/monitor") as ws:
+                ws.receive_json()
+            with session.websocket_connect("/ws/log") as ws:
+                ws.receive_json()
+        assert session.ws_conexiones == [1]
+
     def test_ultimo_cliente_detiene_muestreo(self, session):
         with session.websocket_connect("/ws/monitor") as ws:
             ws.receive_json()

@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from fastapi.testclient import TestClient      # noqa: E402
 
-from backend.app import auth, ws as ws_mod     # noqa: E402
+from backend.app import auth, deps as deps_mod, ws as ws_mod  # noqa: E402
 from backend.app.deps import get_api           # noqa: E402
 from backend.app.main import app               # noqa: E402
 
@@ -36,6 +36,9 @@ class FakeAPI:
         if params:
             self.writes.append((cmd, params))
         return self.responses.get(cmd, [])
+
+    def connect(self):
+        pass
 
     def close(self):
         self.cerrada = True
@@ -94,15 +97,16 @@ def make_fake_api():
 
 
 def _reset_ws():
-    """Estado limpio de los muestreadores WS entre tests."""
+    """Estado limpio de los muestreadores WS y la conexión compartida."""
     for m in (ws_mod.muestreador_monitor, ws_mod.muestreador_log):
         m.clientes.clear()
-        m._api = None
         m._tarea = None
     ws_mod._EstadoMonitor.nombres = {}
     ws_mod._EstadoMonitor.nombres_ts = 0.0
     ws_mod._EstadoMonitor.ifaces_prev = {}
     ws_mod._EstadoMonitor.ifaces_prev_ts = 0.0
+    deps_mod._api_compartida = None
+    deps_mod._ultimo_uso = 0.0
 
 
 @pytest.fixture()
@@ -117,14 +121,16 @@ def client(monkeypatch, tmp_path):
 
     fake = make_fake_api()
     app.dependency_overrides[get_api] = lambda: fake
-    # El muestreo WS abre su propia conexión: darle la misma FakeAPI
+    # La conexión compartida de deps (usada por el muestreo WS) también
+    # debe ser la FakeAPI; se cuentan las "conexiones" abiertas.
     conexiones = []
 
-    def crear_fake():
+    def crear_fake(**kwargs):
         conexiones.append(1)
         return fake
 
-    monkeypatch.setattr(ws_mod, "crear_api", crear_fake)
+    monkeypatch.setattr(deps_mod, "MikroTikAPI", crear_fake)
+    monkeypatch.setattr(deps_mod, "load_config", lambda: {})
     with TestClient(app) as c:
         c.fake_api = fake
         c.ws_conexiones = conexiones

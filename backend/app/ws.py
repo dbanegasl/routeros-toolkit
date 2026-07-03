@@ -4,9 +4,9 @@ ws.py — WebSockets con muestreo compartido (/ws/monitor y /ws/log)
 
 Un solo bucle de muestreo por stream, sin importar cuántas pestañas
 estén conectadas: el primer cliente lo arranca, el último lo detiene,
-y todos reciben el MISMO snapshot (el hEX lite no debe ver N clientes
-API). El muestreo usa el mismo candado global que las peticiones HTTP
-y mantiene una conexión persistente al router (se reabre sola si falla).
+y todos reciben el MISMO snapshot. El muestreo usa usar_api de deps:
+la MISMA conexión persistente que las peticiones HTTP — navegar entre
+páginas del panel no genera logins/logouts en el syslog del router.
 
 Autenticación: la misma cookie de sesión del resto de la API; sin
 sesión válida el socket se cierra con código 4401.
@@ -20,20 +20,13 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from starlette.concurrency import run_in_threadpool
 
 from core.monitoreo import snapshot_consumo, obtener_log, nivel_log
-from lib import MikroTikAPI, load_config, build_name_map, get_lan_prefix
+from lib import build_name_map, get_lan_prefix
 from .auth import _sesion_valida
-from .deps import _router_lock
+from .deps import usar_api
 
 router = APIRouter()
 
 CIERRE_SIN_SESION = 4401
-
-
-def crear_api() -> MikroTikAPI:
-    """Abre la conexión persistente del muestreo (los tests la sustituyen)."""
-    api = MikroTikAPI(**load_config())
-    api.connect()
-    return api
 
 
 def _intervalo() -> float:
@@ -48,7 +41,6 @@ class Muestreador:
         self.muestrear = muestrear      # función BLOQUEANTE api → dict
         self.clientes: set[WebSocket] = set()
         self._tarea: asyncio.Task | None = None
-        self._api: MikroTikAPI | None = None
 
     async def conectar(self, ws: WebSocket):
         self.clientes.add(ws)
@@ -61,47 +53,23 @@ class Muestreador:
             self._tarea.cancel()
             self._tarea = None
 
-    # -- conexión persistente al router (hilo del muestreo) ---------------
-
     def _tomar_muestra(self) -> dict:
-        """Corre en el threadpool: conexión viva + candado global."""
-        with _router_lock:
-            if self._api is None:
-                self._api = crear_api()
-            try:
-                return self.muestrear(self._api)
-            except Exception:
-                # Conexión rota: cerrar y dejar que el próximo ciclo reabra
-                try:
-                    self._api.close()
-                finally:
-                    self._api = None
-                raise
-
-    def _cerrar_api(self):
-        with _router_lock:
-            if self._api is not None:
-                try:
-                    self._api.close()
-                finally:
-                    self._api = None
+        """Corre en el threadpool, con la conexión compartida de deps."""
+        return usar_api(self.muestrear)
 
     async def _bucle(self):
-        try:
-            while self.clientes:
+        while self.clientes:
+            try:
+                datos = await run_in_threadpool(self._tomar_muestra)
+            except Exception as e:
+                datos = {"error": f"No se pudo leer el router: {e}"}
+            datos["ts"] = time.time()
+            for ws in list(self.clientes):
                 try:
-                    datos = await run_in_threadpool(self._tomar_muestra)
-                except Exception as e:
-                    datos = {"error": f"No se pudo leer el router: {e}"}
-                datos["ts"] = time.time()
-                for ws in list(self.clientes):
-                    try:
-                        await ws.send_json(datos)
-                    except Exception:
-                        self.clientes.discard(ws)
-                await asyncio.sleep(_intervalo())
-        finally:
-            await run_in_threadpool(self._cerrar_api)
+                    await ws.send_json(datos)
+                except Exception:
+                    self.clientes.discard(ws)
+            await asyncio.sleep(_intervalo())
 
 
 # ---------------------------------------------------------------------------

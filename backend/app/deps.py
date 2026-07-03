@@ -41,6 +41,41 @@ def cerrar_api_compartida():
                 _api_compartida = None
 
 
+def _obtener_api() -> MikroTikAPI:
+    """Retorna la conexión persistente, reconectando si hace falta.
+
+    ASUME el candado tomado. Si la conexión estuvo ociosa, primero se
+    comprueba con una lectura barata que el router no la haya cortado.
+    """
+    global _api_compartida
+    if (_api_compartida is not None
+            and time.time() - _ultimo_uso > VERIFICAR_TRAS_OCIO):
+        try:
+            _api_compartida.command("/system/identity/print")
+        except Exception:
+            try:
+                _api_compartida.close()
+            except Exception:
+                pass
+            _api_compartida = None
+
+    if _api_compartida is None:
+        api = MikroTikAPI(**load_config())
+        api.connect()
+        _api_compartida = api
+    return _api_compartida
+
+
+def _resetear_api():
+    """Cierra y descarta la conexión (se asume rota). Candado tomado."""
+    global _api_compartida
+    if _api_compartida is not None:
+        try:
+            _api_compartida.close()
+        finally:
+            _api_compartida = None
+
+
 def get_api():
     """Dependencia FastAPI: la conexión persistente, bajo candado global.
 
@@ -50,26 +85,11 @@ def get_api():
     no daña la conexión y la deja viva; cualquier otro error se asume
     conexión rota: se cierra y la siguiente petición reconecta.
     """
-    global _api_compartida, _ultimo_uso
+    global _ultimo_uso
     with _router_lock:
-        # Conexión ociosa: comprobar que siga viva antes de reutilizarla
-        if (_api_compartida is not None
-                and time.time() - _ultimo_uso > VERIFICAR_TRAS_OCIO):
-            try:
-                _api_compartida.command("/system/identity/print")
-            except Exception:
-                try:
-                    _api_compartida.close()
-                except Exception:
-                    pass
-                _api_compartida = None
-
-        if _api_compartida is None:
-            api = MikroTikAPI(**load_config())
-            api.connect()
-            _api_compartida = api
+        api = _obtener_api()
         try:
-            yield _api_compartida
+            yield api
             _ultimo_uso = time.time()
         except (MikroTikCommandError, GeneratorExit):
             # Un !trap no rompe la conexión; GeneratorExit es teardown
@@ -77,10 +97,29 @@ def get_api():
             _ultimo_uso = time.time()
             raise
         except BaseException:
-            try:
-                _api_compartida.close()
-            finally:
-                _api_compartida = None
+            _resetear_api()
+            raise
+
+
+def usar_api(func):
+    """Ejecuta func(api) con la MISMA conexión persistente, bajo candado.
+
+    Es el equivalente de get_api para código que no es un endpoint
+    (el muestreo de los WebSockets): así todo el backend comparte una
+    única conexión al router y el syslog no ve logins repetidos.
+    """
+    global _ultimo_uso
+    with _router_lock:
+        api = _obtener_api()
+        try:
+            resultado = func(api)
+            _ultimo_uso = time.time()
+            return resultado
+        except MikroTikCommandError:
+            _ultimo_uso = time.time()
+            raise
+        except BaseException:
+            _resetear_api()
             raise
 
 

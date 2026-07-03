@@ -27,12 +27,17 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
   inicial se mantiene en ~72 KB gzip.
 
 ### Corregido (Fase 3)
-- El backend abría una conexión API por petición y RouterOS anota cada
-  login/logout: el polling del panel inundaba el syslog del router con
-  "user admin logged in/out via api". Ahora `get_api` reutiliza una
-  **conexión persistente** bajo el candado global (un !trap la deja
-  viva, un error de red la resetea, tras 60 s de ocio se verifica antes
-  de reutilizar, y el apagado hace logout limpio). Tests de backend: 35.
+- RouterOS anota cada login/logout de la API y el backend generaba uno
+  por petición HTTP **y otro por cada visita a Monitoreo/Log** (cada
+  muestreador WS abría su propia conexión y la cerraba al salir de la
+  página): el syslog del router se inundaba de "user admin logged
+  in/out via api". Ahora **todo el backend comparte UNA conexión
+  persistente** (`get_api` para HTTP y `usar_api` para el muestreo WS,
+  ambos bajo el candado global): un !trap la deja viva, un error de red
+  la resetea, tras 60 s de ocio se verifica con una lectura barata
+  antes de reutilizarla, y el apagado hace logout limpio. Verificado:
+  6 visitas a páginas WS + 3 peticiones HTTP = una sola línea de login
+  en el syslog. Tests de backend: 36.
 
 ### Agregado (Fase 2 del plan de frontend — 2026-07-02)
 - **SPA React + Vite + TypeScript** (`frontend/src/`): login contra la
