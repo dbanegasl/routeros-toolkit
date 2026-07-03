@@ -133,12 +133,15 @@ docker compose up -d
 Panel en `http://<host>:8080` (cambiable con `PANEL_PORT` en `.env`; ver
 `.env.example`). SPA en español con tema oscuro, usable desde el celular:
 **login**, **Inicio** (estado del router, corte de internet, QoS, top de
-consumo, dispositivos conectados) y **Dispositivos** (inventario con
-búsqueda y filtros). La API se documenta sola en `/api/docs` (Swagger);
-todas las rutas exigen login salvo el healthcheck `/api/salud`. Por ahora
-todo es **solo lectura** — las acciones (bloqueos, horario, QoS) llegan
-en las fases 4 y 5. ⚠️ No abras el puerto al WAN: es un panel de
-administración para la LAN.
+consumo, dispositivos conectados), **Dispositivos** (inventario con
+búsqueda y filtros), **Monitoreo** (gráfica de tráfico en vivo, consumo
+por dispositivo e interfaces vía WebSocket — un solo muestreo al router
+sin importar cuántas pestañas haya) y **Log** (syslog en vivo con filtro
+y follow). La API se documenta sola en `/api/docs` (Swagger); todas las
+rutas exigen login salvo el healthcheck `/api/salud`. Por ahora todo es
+**solo lectura** — las acciones (bloqueos, horario, QoS) llegan en las
+fases 4 y 5. ⚠️ No abras el puerto al WAN: es un panel de administración
+para la LAN.
 
 ---
 

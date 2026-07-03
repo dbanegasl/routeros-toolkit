@@ -7,6 +7,38 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Agregado (Fase 3 del plan de frontend — 2026-07-02)
+- **WebSockets con muestreo compartido** (`backend/app/ws.py`):
+  `/ws/monitor` (consumo por dispositivo + velocidad real por interfaz)
+  y `/ws/log` (syslog con niveles). Un solo bucle de muestreo por
+  stream sin importar cuántas pestañas estén conectadas — el primer
+  cliente lo arranca, el último lo detiene, todos reciben el mismo
+  snapshot; conexión persistente al router bajo el mismo candado global
+  (se reabre sola si falla). Sin sesión el socket se cierra con 4401.
+  Verificado en vivo: dos clientes simultáneos recibieron timestamps
+  idénticos (un solo muestreo al router).
+- **Página Monitoreo**: gráfica en vivo del tráfico total (↓/↑, paleta
+  validada para el tema oscuro con el validador de dataviz), tabla de
+  consumo por dispositivo y tabla de interfaces con velocidad real.
+- **Página Log**: visor en vivo del syslog con colores por nivel
+  (como `mant_log.py`), filtro de texto y auto-scroll (follow).
+- Hook `useWs` con reconexión automática (y vuelta al login si el
+  servidor responde 4401). Recharts con carga diferida: el bundle
+  inicial se mantiene en ~72 KB gzip.
+
+### Corregido (Fase 3)
+- RouterOS anota cada login/logout de la API y el backend generaba uno
+  por petición HTTP **y otro por cada visita a Monitoreo/Log** (cada
+  muestreador WS abría su propia conexión y la cerraba al salir de la
+  página): el syslog del router se inundaba de "user admin logged
+  in/out via api". Ahora **todo el backend comparte UNA conexión
+  persistente** (`get_api` para HTTP y `usar_api` para el muestreo WS,
+  ambos bajo el candado global): un !trap la deja viva, un error de red
+  la resetea, tras 60 s de ocio se verifica con una lectura barata
+  antes de reutilizarla, y el apagado hace logout limpio. Verificado:
+  6 visitas a páginas WS + 3 peticiones HTTP = una sola línea de login
+  en el syslog. Tests de backend: 36.
+
 ### Agregado (Fase 2 del plan de frontend — 2026-07-02)
 - **SPA React + Vite + TypeScript** (`frontend/src/`): login contra la
   API, **Inicio** (tarjetas: estado del router con CPU/RAM/disco, corte

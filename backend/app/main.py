@@ -9,14 +9,27 @@ se mapean a HTTP con el mismo criterio que los exit codes del CLI:
 Mensajes en español con sugerencia, nunca tracebacks.
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from lib import MikroTikConnectionError, MikroTikCommandError
-from . import auth
+from . import auth, ws
+from .deps import cerrar_api_compartida
 from .routers import dispositivos, horario, monitoreo, sistema
 
+
+@asynccontextmanager
+async def _ciclo_de_vida(_app: FastAPI):
+    yield
+    # Logout limpio de la conexión persistente al apagar el servicio
+    await run_in_threadpool(cerrar_api_compartida)
+
+
 app = FastAPI(
+    lifespan=_ciclo_de_vida,
     title="RouterOS Toolkit — Panel web",
     description="API del panel de administración del MikroTik hEX lite. "
                 "Inicia sesión en /api/auth/login para usar los endpoints.",
@@ -32,6 +45,7 @@ app.include_router(sistema.router)
 app.include_router(dispositivos.router)
 app.include_router(monitoreo.router)
 app.include_router(horario.router)
+app.include_router(ws.router)
 
 
 @app.exception_handler(MikroTikConnectionError)

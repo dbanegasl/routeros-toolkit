@@ -83,3 +83,35 @@ export interface Consumo {
 export interface Sesion {
   autenticada: boolean;
 }
+
+// ── Mensajes de WebSocket ────────────────────────────────────────────
+
+export interface InterfazViva {
+  nombre: string;
+  activa: boolean;
+  tx_rate: number;
+  rx_rate: number;
+  tx_total: number;
+  rx_total: number;
+}
+
+export interface MonitorMsg {
+  ts: number;
+  error?: string;
+  conexiones_totales: number;
+  dispositivos: ConsumoDispositivo[];
+  interfaces: InterfazViva[];
+}
+
+export interface LogEntrada {
+  hora: string;
+  topics: string;
+  mensaje: string;
+  nivel: "critical" | "error" | "warning" | "info" | "debug";
+}
+
+export interface LogMsg {
+  ts: number;
+  error?: string;
+  entradas: LogEntrada[];
+}
