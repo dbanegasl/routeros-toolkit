@@ -120,7 +120,7 @@ routeros-toolkit/
 
 ---
 
-## 🌐 Panel web (en construcción — Fase 1: API de lectura)
+## 🌐 Panel web (en construcción — Fase 2: Dashboard y Dispositivos)
 
 ```bash
 # 1. Genera la contraseña del panel y pégala en config.env:
@@ -131,11 +131,14 @@ docker compose up -d
 ```
 
 Panel en `http://<host>:8080` (cambiable con `PANEL_PORT` en `.env`; ver
-`.env.example`). La API se documenta sola en `/api/docs` (Swagger); todas
-las rutas exigen login (`POST /api/auth/login`) salvo el healthcheck
-`/api/salud`. En esta fase hay solo **lecturas**: dispositivos, escaneo,
-sistema, interfaces, horario, validación y config. ⚠️ No abras el puerto
-al WAN: es un panel de administración para la LAN.
+`.env.example`). SPA en español con tema oscuro, usable desde el celular:
+**login**, **Inicio** (estado del router, corte de internet, QoS, top de
+consumo, dispositivos conectados) y **Dispositivos** (inventario con
+búsqueda y filtros). La API se documenta sola en `/api/docs` (Swagger);
+todas las rutas exigen login salvo el healthcheck `/api/salud`. Por ahora
+todo es **solo lectura** — las acciones (bloqueos, horario, QoS) llegan
+en las fases 4 y 5. ⚠️ No abras el puerto al WAN: es un panel de
+administración para la LAN.
 
 ---
 

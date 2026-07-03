@@ -56,7 +56,8 @@ class TestLogin:
 class TestRutasProtegidas:
 
     RUTAS = ["/api/sistema", "/api/interfaces", "/api/dispositivos",
-             "/api/escaneo", "/api/horario", "/api/validacion", "/api/config"]
+             "/api/escaneo", "/api/horario", "/api/validacion", "/api/config",
+             "/api/consumo"]
 
     def test_todas_exigen_sesion(self, client):
         for ruta in self.RUTAS:

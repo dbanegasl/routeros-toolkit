@@ -159,3 +159,9 @@ def logout(response: Response, sesion: str = Cookie(default="")):
     _destruir_sesion(sesion)
     response.delete_cookie(COOKIE_SESION)
     return {"mensaje": "Sesión cerrada."}
+
+
+@router.get("/sesion")
+def estado_sesion(sesion: str = Cookie(default="")):
+    """¿Hay sesión vigente? (la SPA lo consulta al cargar; siempre 200)."""
+    return {"autenticada": _sesion_valida(sesion)}

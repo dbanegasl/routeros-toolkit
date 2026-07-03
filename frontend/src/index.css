@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Tema oscuro fijo (como la terminal del CLI) */
+:root {
+  color-scheme: dark;
+}
