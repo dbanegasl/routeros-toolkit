@@ -15,6 +15,9 @@ const Monitoreo = lazy(() =>
 const Log = lazy(() =>
   import("./pages/Log").then((m) => ({ default: m.Log })),
 );
+const Horario = lazy(() =>
+  import("./pages/Horario").then((m) => ({ default: m.Horario })),
+);
 
 export default function App() {
   const sesion = useSesion();
@@ -44,6 +47,7 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/dispositivos" element={<Dispositivos />} />
           <Route path="/monitoreo" element={<Monitoreo />} />
+          <Route path="/horario" element={<Horario />} />
           <Route path="/log" element={<Log />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

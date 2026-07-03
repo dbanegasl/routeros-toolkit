@@ -37,18 +37,32 @@ ALL_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 # Detección de WAN
 # ---------------------------------------------------------------------------
 
+def _iface_de_ruta(ruta: dict) -> str:
+    """Interfaz de salida de una ruta.
+
+    RouterOS v6 no siempre expone 'interface' en /ip/route/print: cuando
+    el gateway es una IP, la interfaz real viene dentro de
+    gateway-status ('172.10.7.1 reachable via  ether1').
+    """
+    iface = ruta.get("interface", "")
+    if iface:
+        return iface
+    m = re.search(r"via\s+(\S+)", ruta.get("gateway-status", ""))
+    return m.group(1) if m else ""
+
+
 def get_wan_interface(api) -> str:
     routes = api.command("/ip/route/print")
-    for r in routes:
-        if r.get("dst-address") == "0.0.0.0/0" and r.get("active") == "true":
-            iface = r.get("interface", "")
+    default = [r for r in routes if r.get("dst-address") == "0.0.0.0/0"]
+    for r in default:
+        if r.get("active") == "true":
+            iface = _iface_de_ruta(r)
             if iface:
                 return iface
-    for r in routes:
-        if r.get("dst-address") == "0.0.0.0/0":
-            iface = r.get("interface", "")
-            if iface:
-                return iface
+    for r in default:
+        iface = _iface_de_ruta(r)
+        if iface:
+            return iface
     return ""
 
 

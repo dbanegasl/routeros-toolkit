@@ -84,6 +84,29 @@ export interface Sesion {
   autenticada: boolean;
 }
 
+export interface Bloqueo {
+  id: string;
+  ip: string;
+  comentario: string;
+}
+
+export interface BloqueosResp {
+  total: number;
+  bloqueos: Bloqueo[];
+}
+
+export interface WhitelistDispositivo {
+  mac: string;
+  nombre: string;
+  ip: string | null;
+  en_red: boolean;
+  aplicada_en_router: boolean;
+}
+
+export interface WhitelistResp {
+  dispositivos: WhitelistDispositivo[];
+}
+
 // ── Mensajes de WebSocket ────────────────────────────────────────────
 
 export interface InterfazViva {

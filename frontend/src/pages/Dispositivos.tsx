@@ -1,9 +1,21 @@
 import { useMemo, useState } from "react";
 
-import { useDispositivos } from "../api/hooks";
+import {
+  useBloquear,
+  useBloqueos,
+  useDesbloquear,
+  useDispositivos,
+} from "../api/hooks";
+import { Confirmar } from "../components/Confirmar";
 import { es } from "../i18n/es";
 
 const t = es.dispositivos;
+
+interface AccionPendiente {
+  tipo: "bloquear" | "desbloquear";
+  ip: string;
+  nombre: string;
+}
 
 type Filtro = "todos" | "DHCP" | "STATIC";
 
@@ -21,8 +33,27 @@ function colorEstado(estado: string): string {
 
 export function Dispositivos() {
   const { data, isLoading, isError } = useDispositivos();
+  const bloqueos = useBloqueos();
+  const bloquear = useBloquear();
+  const desbloquear = useDesbloquear();
   const [busqueda, setBusqueda] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [accion, setAccion] = useState<AccionPendiente | null>(null);
+
+  const ipsBloqueadas = useMemo(
+    () => new Set((bloqueos.data?.bloqueos ?? []).map((b) => b.ip)),
+    [bloqueos.data],
+  );
+  const mutando = bloquear.isPending || desbloquear.isPending;
+
+  function ejecutarAccion() {
+    if (!accion) return;
+    const mutacion = accion.tipo === "bloquear" ? bloquear : desbloquear;
+    mutacion.mutate(
+      { ip: accion.ip },
+      { onSettled: () => setAccion(null) },
+    );
+  }
 
   const filtrados = useMemo(() => {
     const lista = data?.dispositivos ?? [];
@@ -87,30 +118,59 @@ export function Dispositivos() {
                   <th className="px-4 py-3">{t.colEstado}</th>
                   <th className="px-4 py-3">{t.colPuerto}</th>
                   <th className="px-4 py-3">{t.colTipo}</th>
+                  <th className="px-4 py-3">{t.colAcciones}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/70">
-                {filtrados.map((d) => (
-                  <tr key={`${d.ip}-${d.mac}`} className="hover:bg-slate-900/50">
-                    <td className="px-4 py-2.5 font-mono text-cyan-300">
-                      {d.ip}
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-200">{d.nombre}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
-                      {d.mac || "—"}
-                    </td>
-                    <td className={`px-4 py-2.5 ${colorEstado(d.estado)}`}>
-                      {d.estado}
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-400">{d.puerto}</td>
-                    <td className="px-4 py-2.5 text-xs text-slate-500">
-                      {d.tipo}
-                    </td>
-                  </tr>
-                ))}
+                {filtrados.map((d) => {
+                  const bloqueada = ipsBloqueadas.has(d.ip);
+                  return (
+                    <tr key={`${d.ip}-${d.mac}`}
+                      className="hover:bg-slate-900/50">
+                      <td className="px-4 py-2.5 font-mono text-cyan-300">
+                        {d.ip}
+                        {bloqueada && (
+                          <span className="ml-2 text-xs text-rose-400">
+                            {t.bloqueada}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-200">{d.nombre}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
+                        {d.mac || "—"}
+                      </td>
+                      <td className={`px-4 py-2.5 ${colorEstado(d.estado)}`}>
+                        {d.estado}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-400">{d.puerto}</td>
+                      <td className="px-4 py-2.5 text-xs text-slate-500">
+                        {d.tipo}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <button
+                          onClick={() =>
+                            setAccion({
+                              tipo: bloqueada ? "desbloquear" : "bloquear",
+                              ip: d.ip,
+                              nombre: d.nombre,
+                            })
+                          }
+                          className={[
+                            "rounded-lg px-2.5 py-1 text-xs font-medium",
+                            bloqueada
+                              ? "bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30"
+                              : "bg-rose-600/20 text-rose-300 hover:bg-rose-600/30",
+                          ].join(" ")}
+                        >
+                          {bloqueada ? t.desbloquear : `⚠️ ${t.bloquear}`}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {filtrados.length === 0 && (
                   <tr>
-                    <td colSpan={6}
+                    <td colSpan={7}
                       className="px-4 py-8 text-center text-slate-500">
                       {t.vacio}
                     </td>
@@ -124,6 +184,21 @@ export function Dispositivos() {
           </div>
         </>
       )}
+
+      <Confirmar
+        abierto={accion !== null}
+        titulo={accion?.tipo === "bloquear"
+          ? t.tituloBloquear : t.tituloDesbloquear}
+        peligro={accion?.tipo === "bloquear"}
+        ocupado={mutando}
+        onCancelar={() => setAccion(null)}
+        onConfirmar={ejecutarAccion}
+      >
+        {accion &&
+          (accion.tipo === "bloquear"
+            ? t.msjBloquear(accion.nombre, accion.ip)
+            : t.msjDesbloquear(accion.nombre, accion.ip))}
+      </Confirmar>
     </div>
   );
 }

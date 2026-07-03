@@ -259,6 +259,23 @@ class TestCommand(unittest.TestCase):
             api.command("/comando/inexistente")
         self.assertIn("no such command", str(ctx.exception))
 
+    def test_trap_drena_el_done_para_conexiones_reutilizadas(self):
+        """Tras un !trap, el !done que lo sigue debe consumirse: si queda
+        en el socket, el siguiente comando de una conexión persistente
+        leería la respuesta desfasada (regla fantasma / datos truncados)."""
+        rx = (encode_sentence(["!trap", "=message=falló"]) +
+              encode_sentence(["!done"]) +
+              # Respuesta REAL del siguiente comando:
+              encode_sentence(["!re", "=comment=HORARIO-INTERNET"]) +
+              encode_sentence(["!done"]))
+        api = make_api(rx=rx)
+        with self.assertRaises(RuntimeError):
+            api.command("/comando/que/falla")
+        # El siguiente comando en la MISMA conexión ve su propia respuesta
+        result = api.command("/ip/firewall/filter/print")
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["comment"], "HORARIO-INTERNET")
+
     def test_command_envia_params_y_queries(self):
         api = make_api(rx=encode_sentence(["!done"]))
         api.command("/ip/firewall/filter/add",

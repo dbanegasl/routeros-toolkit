@@ -10,8 +10,14 @@ export const es = {
     dashboard: "Inicio",
     dispositivos: "Dispositivos",
     monitoreo: "Monitoreo",
+    horario: "Horario",
     log: "Log",
     salir: "Salir",
+  },
+  confirmar: {
+    confirmar: "Sí, aplicar",
+    cancelar: "Cancelar",
+    aplicando: "Aplicando…",
   },
   login: {
     titulo: "Panel del router",
@@ -62,6 +68,47 @@ export const es = {
     colTipo: "Tipo",
     total: (n: number) => `${n} dispositivo(s)`,
     vacio: "Ningún dispositivo coincide con la búsqueda.",
+    colAcciones: "Acciones",
+    bloquear: "Bloquear",
+    desbloquear: "Desbloquear",
+    bloqueada: "🚫 bloqueada",
+    tituloBloquear: "Bloquear dispositivo",
+    tituloDesbloquear: "Desbloquear dispositivo",
+    msjBloquear: (nombre: string, ip: string) =>
+      `Se agregará una regla en el firewall que corta TODO el tráfico de ${nombre} (${ip}). Es reversible desde esta misma tabla.`,
+    msjDesbloquear: (nombre: string, ip: string) =>
+      `Se quitará la regla de bloqueo de ${nombre} (${ip}) y recuperará internet de inmediato.`,
+  },
+  horario: {
+    titulo: "Horario de internet",
+    sinCorte: "No hay ningún corte programado.",
+    estado: "Corte programado",
+    editor: "Programar corte",
+    editorReemplazar: "Reemplazar corte",
+    inicio: "Sin internet desde",
+    fin: "hasta",
+    dias: "Días del corte",
+    todosLosDias: "Todos los días",
+    aplicar: "Aplicar horario",
+    eliminar: "Eliminar corte",
+    tituloCrear: "Programar corte de internet",
+    msjCrear: (inicio: string, fin: string, dias: string, n: number) =>
+      `TODOS los dispositivos quedarán sin internet de ${inicio} a ${fin} (${dias}), excepto los ${n} de la lista blanca. Es reversible con "Eliminar corte".`,
+    tituloEliminar: "Eliminar corte de internet",
+    msjEliminar:
+      "Se quitan todas las reglas del corte: internet sin restricciones para todos. La lista blanca queda guardada y se reaplica al reprogramar.",
+    whitelist: "Lista blanca — siempre con internet",
+    whitelistAyuda:
+      "Los dispositivos marcados nunca pierden internet, ni durante el corte. Marca o desmarca y guarda.",
+    guardarWhitelist: "Guardar lista blanca",
+    tituloWhitelist: "Actualizar lista blanca",
+    msjWhitelist: (n: number) =>
+      `La lista blanca quedará con ${n} dispositivo(s). Se reconstruyen las reglas en el router y el resto queda sujeto al corte.`,
+    enRed: "en red",
+    offline: "no conectado",
+    paquetes: (n: number) => `${n.toLocaleString("es")} paquetes bloqueados`,
+    sinCambios: "No hay cambios que guardar.",
+    hecho: "Listo ✓",
   },
   monitoreo: {
     titulo: "Monitoreo en vivo",
