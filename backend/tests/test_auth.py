@@ -67,3 +67,26 @@ class TestRutasProtegidas:
         r = client.get("/api/salud")
         assert r.status_code == 200
         assert r.json() == {"estado": "ok"}
+
+
+class TestHardening:
+
+    RUTAS_QOS = ["/api/qos/plan", "/api/qos/diagnostico", "/api/respaldos"]
+
+    def test_rutas_fase5_exigen_sesion(self, client):
+        for ruta in self.RUTAS_QOS:
+            assert client.get(ruta).status_code == 401, ruta
+
+    def test_cabeceras_de_seguridad_en_toda_respuesta(self, client):
+        for ruta in ("/api/salud", "/api/sistema"):     # pública y protegida
+            r = client.get(ruta)
+            assert r.headers["X-Content-Type-Options"] == "nosniff", ruta
+            assert r.headers["X-Frame-Options"] == "DENY", ruta
+            assert r.headers["Referrer-Policy"] == "no-referrer", ruta
+            assert r.headers["Cache-Control"] == "no-store", ruta
+
+    def test_cookie_httponly_y_samesite_strict(self, client):
+        r = client.post("/api/auth/login", json={"password": PASSWORD_TEST})
+        cookie = r.headers["set-cookie"].lower()
+        assert "httponly" in cookie
+        assert "samesite=strict" in cookie

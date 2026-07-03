@@ -149,8 +149,10 @@ def login(body: LoginBody, request: Request, response: Response):
         raise HTTPException(status_code=401, detail="Contraseña incorrecta.")
 
     token = _crear_sesion()
+    # samesite=strict: la cookie solo viaja en peticiones originadas en el
+    # propio panel — ni siquiera al navegar hacia él desde otro sitio.
     response.set_cookie(COOKIE_SESION, token, httponly=True,
-                        samesite="lax", max_age=get_session_ttl())
+                        samesite="strict", max_age=get_session_ttl())
     return {"mensaje": "Sesión iniciada."}
 
 

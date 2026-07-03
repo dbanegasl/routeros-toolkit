@@ -8,6 +8,8 @@ COPY index.html vite.config.ts tsconfig.json ./
 COPY src/ src/
 RUN npm run build
 
-FROM nginx:alpine
+# Imagen no-root: nginx corre como usuario `nginx` (uid 101) y escucha
+# en 8080 (los puertos <1024 requieren root)
+FROM nginxinc/nginx-unprivileged:alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /build/dist/ /usr/share/nginx/html/

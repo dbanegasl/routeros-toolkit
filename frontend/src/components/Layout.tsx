@@ -16,6 +16,7 @@ const enlaces = [
   { a: "/qos", texto: es.nav.qos, icono: "⚡" },
   { a: "/log", texto: es.nav.log, icono: "📜" },
   { a: "/respaldos", texto: es.nav.respaldos, icono: "💾" },
+  { a: "/sistema", texto: es.nav.sistema, icono: "🩺" },
 ];
 
 function clasesEnlace(activo: boolean): string {
@@ -73,12 +74,12 @@ export function Layout({ children }: { children: ReactNode }) {
           <NavLink key={e.a} to={e.a} end={e.a === "/"}
             className={({ isActive }) =>
               [
-                "flex flex-1 flex-col items-center gap-0.5 py-2 text-xs",
+                "flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[10px]",
                 isActive ? "text-sky-300" : "text-slate-500",
               ].join(" ")
             }>
-            <span className="text-lg">{e.icono}</span>
-            {e.texto}
+            <span className="text-base">{e.icono}</span>
+            <span className="max-w-full truncate">{e.texto}</span>
           </NavLink>
         ))}
       </nav>

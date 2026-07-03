@@ -34,11 +34,25 @@ app = FastAPI(
     title="RouterOS Toolkit — Panel web",
     description="API del panel de administración del MikroTik hEX lite. "
                 "Inicia sesión en /api/auth/login para usar los endpoints.",
-    version="0.1.0",
+    version="2.0.0",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
     redoc_url=None,
 )
+
+
+@app.middleware("http")
+async def cabeceras_de_seguridad(request: Request, call_next):
+    """Cabeceras de seguridad en toda respuesta de la API (nginx añade
+    las suyas para la SPA; aquí quedan garantizadas aunque se hable con
+    el backend directo). no-store: las respuestas llevan datos del
+    router y van atadas a la sesión — nada de caches intermedios."""
+    respuesta = await call_next(request)
+    respuesta.headers.setdefault("X-Content-Type-Options", "nosniff")
+    respuesta.headers.setdefault("X-Frame-Options", "DENY")
+    respuesta.headers.setdefault("Referrer-Policy", "no-referrer")
+    respuesta.headers.setdefault("Cache-Control", "no-store")
+    return respuesta
 
 app.include_router(auth.router)
 app.include_router(sistema.salud_router)

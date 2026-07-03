@@ -56,12 +56,38 @@ export interface Horario {
 }
 
 export interface Validacion {
-  identidad: { nombre: string; version: string; equipo: string };
+  identidad: {
+    nombre: string;
+    version: string;
+    equipo: string;
+    cpu: string;
+    ram_total: number;
+  };
+  interfaces: { nombre: string; activa: boolean; mtu: string }[];
+  direcciones: { direccion: string; interfaz: string }[];
+  dispositivo_prioritario: {
+    nombre: string;
+    mac: string;
+    lease: { ip: string; mac: string; hostname: string } | null;
+  };
+  fasttrack: { comentario: string; deshabilitado: boolean }[];
   qos: { mangle: number; queue_tree: number; queue_simple: number; activo: boolean };
   reloj: {
+    hora_router: string | null;
+    hora_servidor: string;
     deriva_segundos: number | null;
     sincronizado: boolean;
     ntp_habilitado: boolean | null;
+  };
+}
+
+export interface Config {
+  router: { host: string; port: number; usuario: string };
+  lan_prefix: string;
+  qos: {
+    dispositivo_prioritario: { nombre: string; ip: string };
+    descarga_total_mbps: number;
+    subida_total_mbps: number;
   };
 }
 

@@ -43,7 +43,7 @@ El **menú principal** tiene 7 categorías y 29 opciones. Selecciona con número
 
 Todos los scripts funcionan también standalone desde la raíz del proyecto.
 
-La lógica de negocio vive en **`core/`** (stdlib puro, sin prints): los scripts de `scripts/` son la capa de presentación CLI sobre esos módulos (`core/dispositivos.py`, `core/monitoreo.py`, `core/bloqueos.py`, `core/horario.py`, `core/qos.py`, `core/respaldo.py`). Sobre esa misma capa corre el **panel web** (`backend/` FastAPI + `frontend/` nginx, vía `docker compose up -d`): endpoints de lectura protegidos por login propio de la app, documentados en `/api/docs` (Swagger). Ver README § Panel web.
+La lógica de negocio vive en **`core/`** (stdlib puro, sin prints): los scripts de `scripts/` son la capa de presentación CLI sobre esos módulos (`core/dispositivos.py`, `core/monitoreo.py`, `core/bloqueos.py`, `core/horario.py`, `core/qos.py`, `core/respaldo.py`). Sobre esa misma capa corre el **panel web** (`backend/` FastAPI + `frontend/` nginx, vía `docker compose up -d`): paridad completa con el menú, login propio de la app y API documentada en `/api/docs` (Swagger). Ver README § Panel web y la sección "Panel web — mapa endpoint ↔ menú" más abajo.
 
 ---
 
@@ -260,6 +260,44 @@ python3 scripts/qos_diagnostico.py            # verificar marcado de tráfico
 python3 scripts/qos_monitor.py             # monitor por categoría (5s)
 python3 scripts/qos_reset.py               # borrar SOLO lo del QoS (reglas 'QoS *', colas QoS_*/DL-*/UL-*)
 ```
+
+---
+
+## 🌐 Panel web — mapa endpoint ↔ menú
+
+Toda operación del menú CLI tiene su equivalente en el panel (v2.0.0).
+Autenticación: `POST /api/auth/login` (cookie httpOnly) · `POST
+/api/auth/logout` · `GET /api/auth/sesion`. Los endpoints ⚠️ exigen el
+cuerpo `{"confirmar": true}` (espejo del dict `CONFIRMAR` del menú) y la
+UI siempre muestra un diálogo de confirmación antes.
+
+| Menú | Operación | Endpoint | Página |
+|------|-----------|----------|--------|
+| 1 | Inventario de dispositivos | `GET /api/dispositivos` | Dispositivos |
+| 2–3 | Estadísticas / velocidad por interfaz | `GET /api/interfaces` · `WS /ws/monitor` | Monitoreo |
+| 4 | Información del sistema | `GET /api/sistema` | Inicio · Sistema |
+| 10–11 | Top consumidores | `GET /api/consumo?top=N` | Inicio |
+| 12 | Monitor en vivo | `WS /ws/monitor` | Monitoreo |
+| 20–21 | Log del router (y follow) | `WS /ws/log` | Log |
+| 22–23 | Bloquear / desbloquear / listar | `GET/POST /api/bloqueos` · `DELETE /api/bloqueos/{ip}` ⚠️ | Dispositivos |
+| 24–25 | Respaldar / ver respaldos | `GET /api/respaldos` · `POST /api/respaldos {"full": bool}` | Respaldos |
+| 30–33 | Escanear y clasificar | `GET /api/escaneo?filtro=&online=` | Dispositivos |
+| 40–41 | Programar / ver corte | `POST /api/horario` ⚠️ · `GET /api/horario` | Horario |
+| 42 | Lista blanca | `GET/PUT /api/horario/whitelist` ⚠️ | Horario |
+| 43 | Eliminar corte | `DELETE /api/horario` ⚠️ | Horario |
+| 50 | Ver plan QoS (dry-run) | `GET /api/qos/plan` | QoS |
+| 51 | Desplegar QoS | `POST /api/qos/desplegar` ⚠️ | QoS |
+| 52 | Diagnosticar QoS | `GET /api/qos/diagnostico` | QoS |
+| 53 | Monitor QoS | `WS /ws/qos` | QoS |
+| 54 | Eliminar QoS (reset) | `DELETE /api/qos` ⚠️ | QoS |
+| 90 | Probar conexión | `GET /api/salud` (público: healthcheck) | — |
+| 91 | Ver configuración | `GET /api/config` (sin secretos) | Sistema |
+| 92 | Validación completa | `GET /api/validacion` | Sistema |
+
+Errores en el mismo espíritu que los exit codes del CLI: `401` sin
+sesión, `502` conexión/login al router (`MikroTikConnectionError`),
+`400` !trap/configuración (`MikroTikCommandError`) — siempre con
+`detail` en español y `sugerencia`.
 
 ---
 

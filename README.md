@@ -110,7 +110,7 @@ routeros-toolkit/
 │   ├── app/                   # main, auth (login/sesiones), deps, routers/
 │   ├── tests/                 # pytest + FakeAPI (sin router)
 │   └── generar_hash.py        # genera APP_PASSWORD_HASH para config.env
-├── frontend/                  # Panel web: nginx + SPA (placeholder en Fase 1)
+├── frontend/                  # Panel web: SPA React+Vite+TS servida por nginx
 ├── docker-compose.yml         # 2 servicios: api + web (un solo puerto expuesto)
 ├── backups/                   # Snapshots del router (en .gitignore)
 ├── tests/                     # Suite de tests (unittest, sin router)
@@ -120,7 +120,11 @@ routeros-toolkit/
 
 ---
 
-## 🌐 Panel web (en construcción — Fase 2: Dashboard y Dispositivos)
+## 🌐 Panel web (v2.0.0)
+
+Todo el menú, desde el navegador (y el celular): SPA en español con tema
+oscuro sobre una API FastAPI que reutiliza `lib/` + `core/` — la misma
+lógica que el CLI, dos presentaciones.
 
 ```bash
 # 1. Genera la contraseña del panel y pégala en config.env:
@@ -130,20 +134,31 @@ python3 backend/generar_hash.py
 docker compose up -d
 ```
 
-Panel en `http://<host>:8080` (cambiable con `PANEL_PORT` en `.env`; ver
-`.env.example`). SPA en español con tema oscuro, usable desde el celular:
-**login**, **Inicio** (estado del router, corte de internet, QoS, top de
-consumo, dispositivos conectados), **Dispositivos** (inventario con
-búsqueda, filtros y bloquear/desbloquear ⚠️), **Monitoreo** (gráfica de
-tráfico en vivo, consumo por dispositivo e interfaces vía WebSocket —
-un solo muestreo al router sin importar cuántas pestañas haya),
-**Horario** (programar/eliminar el corte de internet ⚠️ y gestionar la
-lista blanca) y **Log** (syslog en vivo con filtro y follow). La API se
-documenta sola en `/api/docs` (Swagger); todas las rutas exigen login
-salvo el healthcheck `/api/salud`, y toda escritura exige además
-`{"confirmar": true}` + diálogo de confirmación en la UI. Falta QoS
-(fase 5). ⚠️ No abras el puerto al WAN: es un panel de administración
-para la LAN.
+Panel en `http://<host>:8080`. Variables opcionales — en `.env` (compose):
+`PANEL_PORT` (puerto en el host) y `TZ` (zona horaria de los snapshots);
+en `config.env` (servicio api): `APP_PASSWORD_HASH` (obligatoria),
+`APP_SESSION_TTL` (duración de la sesión, default 12 h) y
+`APP_WS_INTERVALO` (segundos entre muestreos WebSocket, default 3).
+
+**Páginas**: **Inicio** (estado del router, corte, QoS, top de consumo) ·
+**Dispositivos** (inventario con búsqueda y bloquear/desbloquear ⚠️) ·
+**Monitoreo** (gráfica de tráfico e interfaces en vivo por WebSocket — un
+solo muestreo al router sin importar cuántas pestañas haya) · **Horario**
+(programar/eliminar el corte ⚠️ y lista blanca) · **QoS** (plan dry-run
+idéntico al CLI, desplegar ⚠️, diagnóstico, monitor en vivo, reset ⚠️) ·
+**Log** (syslog con follow y filtro) · **Respaldos** (snapshot local +
+`.backup` en el router) · **Sistema** (validación con checks ✓/⚠️/❌ y
+configuración sin secretos).
+
+**Seguridad**: login propio del panel (PBKDF2 stdlib — la contraseña del
+router nunca viaja al navegador), cookie de sesión httpOnly +
+SameSite=Strict, rate-limit de login (5/min), cabeceras de seguridad y
+CSP en nginx, contenedores no-root con `no-new-privileges`, un solo
+puerto expuesto a la LAN. Toda escritura exige `{"confirmar": true}` +
+diálogo ⚠️ en la UI (espejo del dict `CONFIRMAR` del menú). La API se
+documenta sola en `/api/docs` (Swagger); el mapa completo endpoint ↔
+opción del menú está en [`index.md`](index.md). ⚠️ No abras el puerto al
+WAN: es un panel de administración para la LAN.
 
 ---
 
