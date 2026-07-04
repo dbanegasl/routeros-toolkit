@@ -13,7 +13,11 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    env_file: config.env              # credenciales del router (nunca en la imagen)
+    env_file:
+      # format: raw — sin interpolación de $: APP_PASSWORD_HASH contiene
+      # '$' literales (pbkdf2_sha256$...) que compose trataría de expandir
+      - path: config.env              # credenciales del router (nunca en la imagen)
+        format: raw
     environment:
       - TZ=${TZ:-UTC}                 # zona horaria: fechas de snapshots (ver .env)
     volumes:

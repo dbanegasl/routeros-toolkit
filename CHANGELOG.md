@@ -12,6 +12,9 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
   (sin venv): el hashing PBKDF2 se movió de `auth.py` a
   `backend/app/hashing.py` (solo stdlib) para no arrastrar el import de
   FastAPI; `auth.py` lo re-exporta, nada más cambia.
+- compose ya no interpola los `$` de `config.env` (`env_file` con
+  `format: raw`): un `APP_PASSWORD_HASH` cuya sal empezara con letra se
+  vaciaba en silencio y rompía el login del panel.
 
 ## [2.0.0] — 2026-07-02
 
