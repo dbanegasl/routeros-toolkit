@@ -11,9 +11,6 @@ auth.py — Login con contraseña propia de la app, sesiones y rate-limit
 - Rate-limit del login: 5 intentos por minuto por IP.
 """
 
-import hashlib
-import hmac
-import os
 import secrets
 import threading
 import time
@@ -22,9 +19,9 @@ from fastapi import APIRouter, Cookie, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from .deps import get_password_hash, get_session_ttl
+from .hashing import generar_hash, verificar_password  # noqa: F401 (re-export)
 
 COOKIE_SESION = "sesion"
-PBKDF2_ITERACIONES = 240_000
 
 MAX_INTENTOS = 5          # intentos de login permitidos…
 VENTANA_SEGUNDOS = 60     # …por IP dentro de esta ventana
@@ -34,30 +31,6 @@ _sesiones: dict = {}      # token → expiración (epoch)
 _intentos: dict = {}      # ip → [timestamps de intentos fallidos]
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-
-# ---------------------------------------------------------------------------
-# Hash de contraseña (PBKDF2-SHA256, solo stdlib)
-# ---------------------------------------------------------------------------
-
-def generar_hash(password: str) -> str:
-    """'pbkdf2_sha256$<iteraciones>$<salt_hex>$<hash_hex>'"""
-    salt = os.urandom(16)
-    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt,
-                             PBKDF2_ITERACIONES)
-    return f"pbkdf2_sha256${PBKDF2_ITERACIONES}${salt.hex()}${dk.hex()}"
-
-
-def verificar_password(password: str, almacenado: str) -> bool:
-    try:
-        algoritmo, iteraciones, salt_hex, hash_hex = almacenado.split("$")
-        if algoritmo != "pbkdf2_sha256":
-            return False
-        dk = hashlib.pbkdf2_hmac("sha256", password.encode(),
-                                 bytes.fromhex(salt_hex), int(iteraciones))
-        return hmac.compare_digest(dk.hex(), hash_hex)
-    except (ValueError, AttributeError):
-        return False
 
 
 # ---------------------------------------------------------------------------

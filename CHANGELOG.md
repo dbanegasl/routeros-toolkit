@@ -5,6 +5,14 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/)
 y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### Corregido
+- `backend/generar_hash.py` vuelve a funcionar con el Python del sistema
+  (sin venv): el hashing PBKDF2 se movió de `auth.py` a
+  `backend/app/hashing.py` (solo stdlib) para no arrastrar el import de
+  FastAPI; `auth.py` lo re-exporta, nada más cambia.
+
 ## [2.0.0] — 2026-07-02
 
 **El panel web alcanza paridad completa con el menú CLI** (las 29
