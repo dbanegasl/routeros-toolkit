@@ -24,6 +24,9 @@ const QoS = lazy(() =>
 const Respaldos = lazy(() =>
   import("./pages/Respaldos").then((m) => ({ default: m.Respaldos })),
 );
+const Sistema = lazy(() =>
+  import("./pages/Sistema").then((m) => ({ default: m.Sistema })),
+);
 
 export default function App() {
   const sesion = useSesion();
@@ -57,6 +60,7 @@ export default function App() {
           <Route path="/qos" element={<QoS />} />
           <Route path="/log" element={<Log />} />
           <Route path="/respaldos" element={<Respaldos />} />
+          <Route path="/sistema" element={<Sistema />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

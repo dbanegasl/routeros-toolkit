@@ -5,7 +5,47 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es/1.1.0/)
 y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
-## [Sin publicar]
+## [2.0.0] — 2026-07-02
+
+**El panel web alcanza paridad completa con el menú CLI** (las 29
+opciones): fases 0–6 del plan de frontend (`PLAN_FRONTEND.md`). El CLI
+sigue funcionando exactamente igual y sin dependencias.
+
+### Agregado (Fase 6 — cierre, 2026-07-02)
+- Página **Sistema**: `sys_validar` como página web — checks ✓/⚠️/❌
+  (reloj/deriva, NTP, QoS, FastTrack con detección de conflicto,
+  dispositivo prioritario, interfaces), identidad del router y
+  configuración visible del panel (`GET /api/config`, sin secretos).
+- **CI (GitHub Actions)**: 4 jobs — unittest stdlib, pytest del backend,
+  build + vitest del frontend y `docker compose build`.
+- Mapa **endpoint ↔ opción del menú** en `index.md`; README con la
+  sección definitiva del panel (despliegue, variables, seguridad).
+
+### Seguridad (Fase 6 — hardening)
+- Cookie de sesión ahora **SameSite=Strict** (antes Lax).
+- Cabeceras de seguridad en toda respuesta de la API (middleware:
+  `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+  `Cache-Control: no-store`) y en nginx además **CSP**,
+  `Permissions-Policy`, `server_tokens off` y límite de cuerpo (64 KB).
+- El servicio web corre **no-root** (imagen `nginx-unprivileged`,
+  puerto interno 8080) y ambos contenedores con
+  `no-new-privileges:true`. El backend ya corría como `appuser`.
+
+### Agregado (Fase 5 del plan de frontend — 2026-07-02)
+- **QoS desde la web**: `GET /api/qos/plan` (dry-run con los MISMOS
+  builders del CLI — un test pinea que son idénticos), `GET
+  /api/qos/diagnostico` (contadores por prioridad y colas), `POST
+  /api/qos/desplegar` ⚠️, `DELETE /api/qos` ⚠️ (reset selectivo) y
+  monitor en vivo `WS /ws/qos`. Página **QoS** completa.
+- **Respaldos desde la web**: `GET/POST /api/respaldos` (snapshot local;
+  con `full:true` además el `.backup` en el router). Página
+  **Respaldos** con badge de último respaldo.
+- `core/respaldo.list_local_snapshots()`: el listado de snapshots ahora
+  es lógica de `core/` compartida por CLI y web.
+- Compose pasa `TZ` al backend (fechas de snapshots en hora local).
+- La limpieza previa del **despliegue QoS web es selectiva** (solo
+  elementos etiquetados `QoS *`), a diferencia del CLI que limpia todo
+  el Mangle/Queue Tree: las reglas ajenas se preservan.
 
 ### Agregado (Fase 4 del plan de frontend — 2026-07-02)
 - **Primeras escrituras desde la web**, todas con doble salvaguarda:

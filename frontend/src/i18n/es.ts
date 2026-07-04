@@ -14,6 +14,7 @@ export const es = {
     qos: "QoS",
     log: "Log",
     respaldos: "Respaldos",
+    sistema: "Sistema",
     salir: "Salir",
   },
   confirmar: {
@@ -213,6 +214,60 @@ export const es = {
     ilegible: "(no se pudo leer)",
     descargaWinbox:
       "Descárgalos a tu PC desde Winbox (arrastrar desde Files) para conservarlos fuera del equipo.",
+  },
+  sistema: {
+    titulo: "Sistema y validación",
+    checks: "Verificación del router",
+    checkReloj: "Reloj del router",
+    relojOk: (s: number) => `Sincronizado (deriva de ${s} s)`,
+    relojMal: (s: number) =>
+      `Deriva de ${s} s — los cortes por horario pueden dispararse a deshora`,
+    relojDesconocido: "No se pudo leer el reloj del router",
+    checkNtp: "Cliente NTP",
+    ntpOk: "Habilitado",
+    ntpMal: "Deshabilitado — el reloj deriva al reiniciar el router",
+    ntpNa: "No disponible en esta versión de RouterOS",
+    checkQos: "QoS",
+    qosActivo: (m: number, q: number) =>
+      `Desplegado: ${m} reglas Mangle · ${q} colas`,
+    qosInactivo: "Sin desplegar",
+    checkFasttrack: "FastTrack",
+    fasttrackConflicto:
+      "Activo con QoS desplegado — el tráfico esquiva las colas: revisa el despliegue",
+    fasttrackActivo: "Activo (normal sin QoS)",
+    fasttrackApagado: "Deshabilitado (correcto con QoS desplegado)",
+    fasttrackSinReglas: "Sin reglas FastTrack configuradas",
+    checkPrioritario: "Dispositivo prioritario",
+    prioritarioOk: (nombre: string, ip: string) =>
+      `${nombre} con lease DHCP (${ip})`,
+    prioritarioSinLease: (nombre: string) =>
+      `${nombre} sin lease DHCP — no está conectado`,
+    checkInterfaces: "Interfaces",
+    interfacesResumen: (up: number, total: number) =>
+      `${up} de ${total} activas`,
+    identidad: "Identidad del router",
+    nombre: "Nombre",
+    version: "RouterOS",
+    equipo: "Equipo",
+    cpu: "CPU",
+    ram: "RAM total",
+    horaRouter: "Hora del router",
+    horaServidor: "Hora del servidor",
+    interfaces: "Interfaces",
+    colInterfaz: "Interfaz",
+    colActiva: "Estado",
+    colMtu: "MTU",
+    activa: "activa",
+    inactiva: "inactiva",
+    direcciones: "Direcciones IP",
+    colDireccion: "Dirección",
+    configuracion: "Configuración del panel (sin secretos)",
+    confRouter: "Router",
+    confUsuario: "Usuario API",
+    confLan: "Prefijo LAN",
+    confQos: "QoS configurado",
+    confQosDetalle: (nombre: string, ip: string, dl: number, ul: number) =>
+      `${nombre} (${ip}) · ${dl} Mbps ↓ / ${ul} Mbps ↑`,
   },
   errores: {
     cargando: "Cargando…",

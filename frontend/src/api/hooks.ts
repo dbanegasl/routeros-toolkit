@@ -14,6 +14,7 @@ import {
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "./client";
 import type {
   BloqueosResp,
+  Config,
   Consumo,
   DispositivosResp,
   Horario,
@@ -87,6 +88,9 @@ export const useHorario = () =>
 
 export const useValidacion = () =>
   useQuery<Validacion>(lectura<Validacion>("validacion", "/api/validacion"));
+
+export const useConfig = () =>
+  useQuery<Config>(lectura<Config>("config", "/api/config"));
 
 export const useConsumo = (top = 5) =>
   useQuery<Consumo>(
