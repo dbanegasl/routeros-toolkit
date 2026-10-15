@@ -437,10 +437,9 @@ def get_mac_vendor_cache() -> dict:
         "BC:AE:C5": "ASUSTeK",
         "D8:5E:D3": "GIGABYTE",
         "1C:69:7A": "GIGABYTE",
-        "00:90:A9": "Intel",
-        "FC:3C:D7": "Foxconn",
-        "84:28:59": "Liteon/Realtek",
-        "10:BF:67": "Intel",
+        "00:90:A9": "Western Digital",
+        "84:28:59": "Amazon",
+        "10:BF:67": "Amazon",
         "9C:53:22": "Intel",
         "8C:8D:28": "Intel",
         "00:1B:21": "Intel",
@@ -456,8 +455,7 @@ def get_mac_vendor_cache() -> dict:
         "FC:A1:83": "Amazon",
         # TP-Link / Deco
         "DC:62:79": "TP-Link",
-        "54:D6:0D": "TP-Link",
-        "A8:80:55": "TP-Link",
+        "54:D6:0D": "EZVIZ/Hikvision",
         "50:D4:F7": "TP-Link",
         "3C:52:A1": "TP-Link",
         # Hikvision / EZVIZ
@@ -500,9 +498,11 @@ def get_mac_vendor_cache() -> dict:
         "AC:67:B2": "Espressif (IoT)",
         "CC:50:E3": "Espressif (IoT)",
         # Otros
-        "38:1F:8D": "Realtek",
-        "18:DE:50": "Broadcom",
-        "FC:3C:D7": "Foxconn",
+        # Tuya (Smart Life): enchufes, focos e interruptores genéricos
+        "A8:80:55": "Tuya (IoT)",
+        "18:DE:50": "Tuya (IoT)",
+        "FC:3C:D7": "Tuya (IoT)",
+        "38:1F:8D": "Tuya (IoT)",
     }
 
 
