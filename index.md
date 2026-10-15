@@ -209,7 +209,7 @@ Bloquea internet a **todos** los dispositivos en un horario definido, excepto lo
 
 ```bash
 python3 scripts/horario_internet.py            # configurar horario (interactivo)
-python3 scripts/horario_internet.py --list     # ver estado y lista blanca
+python3 scripts/horario_internet.py --list     # ver estado, lista blanca y afectados (quién intenta salir)
 python3 scripts/horario_internet.py --allow    # gestionar lista blanca
 python3 scripts/horario_internet.py --remove   # eliminar todas las reglas
 ```
@@ -285,6 +285,7 @@ UI siempre muestra un diálogo de confirmación antes.
 | 40–41 | Programar / ver corte | `POST /api/horario` ⚠️ · `GET /api/horario` | Horario |
 | 42 | Lista blanca | `GET/PUT /api/horario/whitelist` ⚠️ | Horario |
 | 43 | Eliminar corte | `DELETE /api/horario` ⚠️ | Horario |
+| 41 | Afectados por el corte (y quién intenta salir) | `GET /api/horario/afectados` | Horario |
 | 50 | Ver plan QoS (dry-run) | `GET /api/qos/plan` | QoS |
 | 51 | Desplegar QoS | `POST /api/qos/desplegar` ⚠️ | QoS |
 | 52 | Diagnosticar QoS | `GET /api/qos/diagnostico` | QoS |

@@ -20,6 +20,14 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
   `confirmar`); modal ✏️ en las páginas Dispositivos y Horario.
   `build_device_map` e `inventario_dispositivos` exponen además el
   nombre detectado y el alias por separado.
+- **Afectados por el corte**: dispositivos conectados que no están en la
+  lista blanca (durante el corte: con red pero sin internet), con
+  "intentó salir hace X s". Lo registra una regla nueva etiquetada
+  `HORARIO-INTENTOS` (`add-src-to-address-list`, mismo horario, justo
+  antes del DROP; la marca caduca a los 10 min y se renueva con cada
+  intento). Se crea y borra junto con el corte. `GET
+  /api/horario/afectados`, tarjeta en la página Horario y sección en
+  `horario_internet.py --list`.
 - Lista blanca de la página Horario como tabla: columna de IP, tooltip
   en "en red", buscador y contador de marcados; el panel usa más ancho
   (`max-w-7xl`) y la lista blanca ocupa 3/5 en pantallas grandes.

@@ -6,7 +6,9 @@ horario_internet.py — Corte de internet por horario con lista blanca
 Estrategia (la más segura):
     1. Reglas ACCEPT por MAC  →  dispositivos aprobados (WiFi, cámaras, padres…)
                                   se crean SIN límite de tiempo → siempre con acceso
-    2. Regla DROP global      →  bloquea TODOS los demás durante el horario
+    2. Regla INTENTOS         →  anota en una address-list (10 min) la IP de
+                                  quien intenta salir; no corta, deja seguir
+    3. Regla DROP global      →  bloquea TODOS los demás durante el horario
 
 Resultado:
     - Dispositivos en lista blanca: internet 24h, sin corte.
@@ -16,6 +18,7 @@ Resultado:
 Orden de procesamiento en RouterOS (top-down, primera coincidencia gana):
     [ACCEPT MAC=phone-papa]   → pasa siempre
     [ACCEPT MAC=camara-sala]  → pasa siempre
+    [INTENTOS time=01:00-06:00] → anota la IP y sigue
     [DROP   time=01:00-06:00] → bloquea a todos los demás en ese rango
 
 ¿Es seguro?
@@ -49,6 +52,7 @@ from core.horario import (DROP_TAG, ALLOW_TAG, DAYS_MAP, DAYS_LABEL, ALL_DAYS,
                           get_wan_interface, get_drop_rule, get_allow_rules,
                           normalize_ros_time, parse_drop_time, corte_en_curso,
                           get_router_now, remove_all_rules, apply_all_rules,
+                          dispositivos_afectados, get_try_rule,
                           aplicar_solo_whitelist, load_whitelist, save_whitelist)
 
 
@@ -204,6 +208,26 @@ def list_rules(api):
         print(f"\n  {C.WARN}⚠️  Lista blanca vacía — el corte aplica a "
               f"TODOS los dispositivos.{C.RESET}")
         print(f"  {C.DIM}Usa la opción 42 del menú para agregar excepciones.{C.RESET}")
+
+    # Afectados: conectados y fuera de la lista blanca (sin internet
+    # durante el corte); los que intentan salir, primero
+    allowed = {r.get("src-mac-address", "").upper() for r in allows}
+    afectados = dispositivos_afectados(api, allowed)
+    intentando = sum(1 for a in afectados if a["intento_hace_s"] is not None)
+    titulo = "sin internet ahora" if en_curso else "sujetos al corte"
+    print(f"\n  {C.ERR}🚫 Afectados — {titulo} ({len(afectados)} "
+          f"dispositivo(s), {intentando} intentando salir):{C.RESET}")
+    if not get_try_rule(api):
+        print(f"  {C.DIM}(corte creado sin registro de intentos: reprográmalo "
+              f"para verlos){C.RESET}")
+    for a in afectados:
+        hace = a["intento_hace_s"]
+        if hace is None:
+            estado = f"{C.DIM}sin intentos{C.RESET}"
+        else:
+            cuando = f"{hace} s" if hace < 60 else f"{hace // 60} min"
+            estado = f"{C.ERR}intentó salir hace {cuando}{C.RESET}"
+        print(f"  ✗  {a['ip']:<16} {a['nombre'][:34]:<34} {estado}")
     print()
 
 

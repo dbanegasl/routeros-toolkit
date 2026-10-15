@@ -19,6 +19,7 @@ from core.horario import (get_drop_rule, get_allow_rules, parse_drop_time,
                           corte_en_curso, get_router_now, load_whitelist,
                           save_whitelist, remove_all_rules, apply_all_rules,
                           aplicar_solo_whitelist, get_wan_interface,
+                          get_try_rule, dispositivos_afectados,
                           DAYS_LABEL, ALL_DAYS)
 from lib import build_device_map, load_aliases
 from ..auth import require_session
@@ -137,6 +138,36 @@ def horario(api=Depends(get_api)):
         "hora_actual": hhmm,
         "fuente_reloj": fuente_reloj,
         "whitelist": whitelist,
+    }
+
+
+@router.get("/horario/afectados")
+def afectados(api=Depends(get_api)):
+    """Dispositivos conectados que NO están en la lista blanca: durante el
+    corte tienen red pero no internet. intento_hace_s viene de la
+    address-list que llena la regla HORARIO-INTENTOS (None = no intentó
+    salir en los últimos 10 min)."""
+    macs, _ = _macs_whitelist_actual(api)
+    drop = get_drop_rule(api)
+    en_curso = False
+    if drop:
+        start, end, days = parse_drop_time(drop)
+        ahora = get_router_now(api)
+        if ahora is None:
+            local = datetime.now()
+            ahora = (local.hour * 60 + local.minute,
+                     ALL_DAYS[local.weekday()], "")
+        en_curso = corte_en_curso(start, end, days, ahora[0], ahora[1])
+    filas = dispositivos_afectados(api, macs)
+    return {
+        "hay_corte": drop is not None,
+        "en_curso": en_curso,
+        # Cortes creados antes de existir la regla no registran intentos
+        # hasta reprogramarlos
+        "registra_intentos": get_try_rule(api) is not None,
+        "total": len(filas),
+        "intentando": sum(1 for f in filas if f["intento_hace_s"] is not None),
+        "dispositivos": filas,
     }
 
 

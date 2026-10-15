@@ -13,6 +13,7 @@ import {
 
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "./client";
 import type {
+  AfectadosResp,
   BloqueosResp,
   Config,
   Consumo,
@@ -107,6 +108,11 @@ export const useWhitelist = () =>
     lectura<WhitelistResp>("whitelist", "/api/horario/whitelist"),
   );
 
+export const useAfectados = () =>
+  useQuery<AfectadosResp>(
+    lectura<AfectadosResp>("afectados", "/api/horario/afectados", 15_000),
+  );
+
 export const useQosPlan = () =>
   useQuery<QosPlan>(lectura<QosPlan>("qosPlan", "/api/qos/plan"));
 
@@ -168,13 +174,13 @@ export const useDesbloquear = escritura(
 export const useCrearHorario = escritura(
   (body: { inicio: string; fin: string; dias: string[] }) =>
     apiPost<{ mensaje: string }>("/api/horario", { ...body, confirmar: true }),
-  ["horario", "whitelist"],
+  ["horario", "whitelist", "afectados"],
 );
 
 export const useEliminarHorario = escritura(
   (_body: Record<string, never>) =>
     apiDelete<{ mensaje: string }>("/api/horario", { confirmar: true }),
-  ["horario", "whitelist"],
+  ["horario", "whitelist", "afectados"],
 );
 
 export const useGuardarWhitelist = escritura(
@@ -183,7 +189,7 @@ export const useGuardarWhitelist = escritura(
       ...body,
       confirmar: true,
     }),
-  ["horario", "whitelist"],
+  ["horario", "whitelist", "afectados"],
 );
 
 /** Alias de un dispositivo — vive en config/alias.json, no toca el
@@ -198,7 +204,8 @@ export function useGuardarAlias() {
         { alias: body.alias },
       ),
     onSuccess: () => {
-      for (const key of ["dispositivos", "whitelist", "horario", "consumo"]) {
+      for (const key of ["dispositivos", "whitelist", "horario", "consumo",
+                         "afectados"]) {
         void qc.invalidateQueries({ queryKey: [key] });
       }
     },

@@ -133,6 +133,20 @@ export const es = {
     colMac: "MAC",
     colEstado: "Estado",
     marcados: (n: number, total: number) => `${n} de ${total} marcados`,
+    afectados: "Afectados por el corte",
+    afectadosEnCurso: "Conectados a la red pero SIN internet ahora mismo.",
+    afectadosFuera:
+      "Fuera de horario: estos dispositivos quedarán sin internet cuando empiece el corte.",
+    afectadosResumen: (total: number, intentando: number) =>
+      `${total} dispositivo(s) · ${intentando} intentando salir`,
+    sinAfectados: "Todos los dispositivos conectados están en la lista blanca.",
+    sinRegistro:
+      "Este corte se creó sin el registro de intentos: vuelve a aplicar el horario para ver quién intenta salir.",
+    intentoHace: (s: number) =>
+      s < 60 ? `intentó salir hace ${s} s` : `intentó salir hace ${Math.floor(s / 60)} min`,
+    sinIntentos: "sin intentos",
+    intentosAyuda:
+      "Se registra cada intento de salir a internet durante el corte; la marca caduca a los 10 minutos.",
     buscar: "Buscar por nombre, IP o MAC…",
     paquetes: (n: number) => `${n.toLocaleString("es")} paquetes bloqueados`,
     sinCambios: "No hay cambios que guardar.",

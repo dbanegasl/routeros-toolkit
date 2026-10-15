@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  useAfectados,
   useCrearHorario,
   useDispositivos,
   useEliminarHorario,
@@ -401,6 +402,67 @@ function ListaBlanca() {
   );
 }
 
+function Afectados() {
+  const { data } = useAfectados();
+  const [editando, setEditando] = useState<FilaWhitelist | null>(null);
+  if (!data?.hay_corte) return null;
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+      <div className="mb-1 flex items-baseline justify-between gap-3">
+        <span className="text-sm font-medium text-slate-400">
+          🚫 {t.afectados}
+        </span>
+        <span className="text-xs text-slate-500">
+          {t.afectadosResumen(data.total, data.intentando)}
+        </span>
+      </div>
+      <p className={data.en_curso
+        ? "mb-1 text-xs text-rose-300" : "mb-1 text-xs text-slate-500"}>
+        {data.en_curso ? t.afectadosEnCurso : t.afectadosFuera}
+      </p>
+      <p className="mb-3 text-xs text-slate-600">
+        {data.registra_intentos ? t.intentosAyuda : t.sinRegistro}
+      </p>
+
+      {data.dispositivos.length === 0 ? (
+        <p className="text-sm text-emerald-400">{t.sinAfectados}</p>
+      ) : (
+        <ul className="max-h-96 divide-y divide-slate-800/70 overflow-y-auto rounded-lg border border-slate-800">
+          {data.dispositivos.map((d) => (
+            <li key={d.mac} className="flex items-center gap-3 px-3 py-1.5 text-sm">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-slate-200" title={d.nombre}>
+                  {d.nombre}
+                </div>
+                <div className="font-mono text-xs text-cyan-300/80">{d.ip}</div>
+              </div>
+              <span className={
+                d.intento_hace_s !== null
+                  ? "whitespace-nowrap rounded-full bg-rose-500/15 px-2 py-0.5 text-xs text-rose-300"
+                  : "whitespace-nowrap text-xs text-slate-600"
+              }>
+                {d.intento_hace_s !== null
+                  ? t.intentoHace(d.intento_hace_s) : t.sinIntentos}
+              </span>
+              <button
+                onClick={() => setEditando({ ...d, en_red: true })}
+                title={es.alias.editar}
+                aria-label={es.alias.editar}
+                className="rounded-md px-1.5 py-0.5 text-slate-500 hover:bg-slate-700 hover:text-slate-200"
+              >
+                ✏️
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <EditarAlias dispositivo={editando} onCerrar={() => setEditando(null)} />
+    </div>
+  );
+}
+
 function Eliminar() {
   const { data } = useHorario();
   const eliminar = useEliminarHorario();
@@ -440,6 +502,7 @@ export function Horario() {
           <EstadoCorte />
           <Editor />
           <Eliminar />
+          <Afectados />
         </div>
         <div className="xl:col-span-3">
           <ListaBlanca />
