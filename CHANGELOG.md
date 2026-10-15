@@ -7,7 +7,17 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Agregado
+- **Soporte para RouterOS v7** (probado en hEX S 2025, RouterOS 7.20.8
+  long-term) sin cambiar el comportamiento en v6: todos los scripts de
+  lectura, el panel y el corte por horario verificados contra el router
+  real.
+
 ### Corregido
+- **RouterOS v7**: `get_wan_interface` no detectaba la WAN (v7 ya no
+  expone `gateway-status` en `/ip/route`; ahora se lee `immediate-gw`,
+  `172.10.7.1%ether1`). Sin esto el CLI pedía la interfaz a mano y el
+  panel respondía 400 al programar el corte.
 - `backend/generar_hash.py` vuelve a funcionar con el Python del sistema
   (sin venv): el hashing PBKDF2 se movió de `auth.py` a
   `backend/app/hashing.py` (solo stdlib) para no arrastrar el import de

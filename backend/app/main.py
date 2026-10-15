@@ -32,7 +32,7 @@ async def _ciclo_de_vida(_app: FastAPI):
 app = FastAPI(
     lifespan=_ciclo_de_vida,
     title="RouterOS Toolkit — Panel web",
-    description="API del panel de administración del MikroTik hEX lite. "
+    description="API del panel de administración del router MikroTik. "
                 "Inicia sesión en /api/auth/login para usar los endpoints.",
     version="2.0.0",
     docs_url="/api/docs",

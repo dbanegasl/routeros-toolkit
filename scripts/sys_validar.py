@@ -18,7 +18,7 @@ from lib import (MikroTikAPI, load_config, print_header, fmt_bytes,
 
 
 def main():
-    print_header("🔍 VALIDAR ROUTER — RouterOS v6.49.19")
+    print_header("🔍 VALIDAR ROUTER — RouterOS v6/v7")
     
     config = load_config()
     print(f"Conectando a {config['host']}:{config['port']}...")

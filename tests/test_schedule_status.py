@@ -161,6 +161,20 @@ class TestGetWanInterface(unittest.TestCase):
         ])
         self.assertEqual(schedule.get_wan_interface(api), "ether1")
 
+    def test_v7_immediate_gw(self):
+        """RouterOS v7: sin gateway-status, la interfaz va tras el '%'."""
+        api = self._API([{"dst-address": "0.0.0.0/0", "active": "true",
+                          "gateway": "172.10.7.1",
+                          "immediate-gw": "172.10.7.1%ether1"}])
+        self.assertEqual(schedule.get_wan_interface(api), "ether1")
+
+    def test_v7_immediate_gw_interfaz(self):
+        """RouterOS v7 con gateway por interfaz (p.ej. PPPoE): sin '%'."""
+        api = self._API([{"dst-address": "0.0.0.0/0", "active": "true",
+                          "gateway": "pppoe-out1",
+                          "immediate-gw": "pppoe-out1"}])
+        self.assertEqual(schedule.get_wan_interface(api), "pppoe-out1")
+
     def test_sin_ruta_default(self):
         api = self._API([{"dst-address": "192.168.5.0/24",
                           "gateway": "bridge1"}])
