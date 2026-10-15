@@ -20,7 +20,7 @@ from core.horario import (get_drop_rule, get_allow_rules, parse_drop_time,
                           save_whitelist, remove_all_rules, apply_all_rules,
                           aplicar_solo_whitelist, get_wan_interface,
                           DAYS_LABEL, ALL_DAYS)
-from lib import build_device_map
+from lib import build_device_map, load_aliases
 from ..auth import require_session
 from ..deps import get_api
 
@@ -68,29 +68,44 @@ def _macs_whitelist_actual(api) -> tuple:
     return sorted(aplicadas | set(stored)), stored
 
 
+def _fila_whitelist(mac: str, devices: dict, stored: dict,
+                    aliases: dict) -> dict:
+    """Campos comunes de una MAC de la lista blanca (en red o no).
+
+    nombre = alias del usuario › nombre en la red › nombre guardado;
+    nombre_detectado = el de la red/archivo, sin alias (para el editor).
+    """
+    dev = devices.get(mac)
+    detectado = ((dev or {}).get("detected_name")
+                 or stored.get(mac, {}).get("nombre") or "")
+    alias = aliases.get(mac, "")
+    return {
+        "mac": mac,
+        "nombre": alias or detectado,
+        "nombre_detectado": detectado,
+        "alias": alias,
+        "ip": dev["ip"] if dev else None,
+        "en_red": dev is not None,
+    }
+
+
 @router.get("/horario")
 def horario(api=Depends(get_api)):
     drop = get_drop_rule(api)
     allows = get_allow_rules(api)
     stored = load_whitelist()
     devices = build_device_map(api, by="mac")
+    aliases = load_aliases()
 
     # Lista blanca: unión de reglas aplicadas y archivo persistido
     applied = {r.get("src-mac-address", "").upper(): r for r in allows}
     todas_macs = sorted(set(applied) | set(stored))
-    whitelist = []
-    for mac in todas_macs:
-        dev = devices.get(mac)
-        en_red = dev is not None
-        whitelist.append({
-            "mac": mac,
-            "nombre": ((dev.get("name") if en_red else None)
-                       or stored.get(mac, {}).get("nombre") or ""),
-            "ip": dev["ip"] if en_red else None,
-            "en_red": en_red,
-            "aplicada_en_router": mac in applied,
-            "bytes": int(applied.get(mac, {}).get("bytes", 0)),
-        })
+    whitelist = [
+        {**_fila_whitelist(mac, devices, stored, aliases),
+         "aplicada_en_router": mac in applied,
+         "bytes": int(applied.get(mac, {}).get("bytes", 0))}
+        for mac in todas_macs
+    ]
 
     if not drop:
         return {"corte": None, "en_curso": False, "whitelist": whitelist}
@@ -201,17 +216,12 @@ def ver_whitelist(api=Depends(get_api)):
     aplicadas = {r.get("src-mac-address", "").upper()
                  for r in get_allow_rules(api)}
     devices = build_device_map(api, by="mac")
+    aliases = load_aliases()
     macs = sorted(set(stored) | aplicadas)
     return {
         "dispositivos": [
-            {
-                "mac": mac,
-                "nombre": ((devices.get(mac) or {}).get("name")
-                           or stored.get(mac, {}).get("nombre") or ""),
-                "ip": (devices.get(mac) or {}).get("ip"),
-                "en_red": mac in devices,
-                "aplicada_en_router": mac in aplicadas,
-            }
+            {**_fila_whitelist(mac, devices, stored, aliases),
+             "aplicada_en_router": mac in aplicadas}
             for mac in macs
         ]
     }

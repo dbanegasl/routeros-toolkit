@@ -293,10 +293,12 @@ UI siempre muestra un diálogo de confirmación antes.
 | 90 | Probar conexión | `GET /api/salud` (público: healthcheck) | — |
 | 91 | Ver configuración | `GET /api/config` (sin secretos) | Sistema |
 | 92 | Validación completa | `GET /api/validacion` | Sistema |
+| — | Alias de dispositivos (solo web; el CLI los muestra) | `GET /api/alias` · `PUT /api/alias/{mac} {"alias": "…"}` (vacío = quitar; no toca el router) | Dispositivos · Horario |
 
 Errores en el mismo espíritu que los exit codes del CLI: `401` sin
 sesión, `502` conexión/login al router (`MikroTikConnectionError`),
-`400` !trap/configuración (`MikroTikCommandError`) — siempre con
+`400` !trap/configuración (`MikroTikCommandError`), `500` archivo de
+`config/` ilegible (`ConfigError`) — siempre con
 `detail` en español y `sugerencia`.
 
 ---

@@ -10,7 +10,7 @@ import re
 
 from lib import (resolve_device_name, get_lan_prefix, get_mac_vendor_cache,
                  is_random_mac, lookup_mac_vendor_online,
-                 load_oui_cache, save_oui_cache)
+                 load_oui_cache, save_oui_cache, load_aliases)
 
 # Palabras clave en hostname que sugieren tipo de dispositivo
 MOBILE_KEYWORDS  = ["iphone", "ipad", "android", "samsung", "xiaomi", "redmi",
@@ -37,10 +37,13 @@ def inventario_dispositivos(api) -> list:
     """Inventario completo: leases DHCP + IPs estáticas detectadas en ARP.
 
     Retorna una lista de dicts ordenada por IP:
-        {ip, mac, nombre, estado, puerto, tipo}
+        {ip, mac, nombre, nombre_detectado, alias, estado, puerto, tipo}
     donde tipo es "DHCP" o "STATIC" y estado es el status del lease
     ("bound", "waiting", …) o "estática" para entradas solo-ARP.
+    nombre es el alias del usuario si existe; nombre_detectado, el que
+    se deduce del router (hostname / fabricante / MAC).
     """
+    aliases = load_aliases()
     lan = get_lan_prefix(api)
     arp_entries = api.command("/ip/arp/print")
     arp_map = {e["address"]: e.get("mac-address", "") for e in arp_entries
@@ -62,7 +65,10 @@ def inventario_dispositivos(api) -> list:
         rows.append({
             "ip":     ip,
             "mac":    mac,
-            "nombre": resolve_device_name(ip, mac, hostname, is_static=False),
+            "nombre": resolve_device_name(ip, mac, hostname, False, aliases),
+            "nombre_detectado": resolve_device_name(ip, mac, hostname,
+                                                    False, {}),
+            "alias": aliases.get(mac.upper(), ""),
             "estado": lease.get("status", "?"),
             "puerto": mac_to_port.get(mac, "—"),
             "tipo":   "DHCP",
@@ -73,7 +79,9 @@ def inventario_dispositivos(api) -> list:
             rows.append({
                 "ip":     ip,
                 "mac":    mac,
-                "nombre": resolve_device_name(ip, mac, "", is_static=True),
+                "nombre": resolve_device_name(ip, mac, "", True, aliases),
+                "nombre_detectado": resolve_device_name(ip, mac, "", True, {}),
+                "alias": aliases.get(mac.upper(), ""),
                 "estado": "estática",
                 "puerto": mac_to_port.get(mac, "—"),
                 "tipo":   "STATIC",

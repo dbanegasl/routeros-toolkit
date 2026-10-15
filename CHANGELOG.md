@@ -12,12 +12,27 @@ y el versionado sigue [SemVer](https://semver.org/lang/es/).
   long-term) sin cambiar el comportamiento en v6: todos los scripts de
   lectura, el panel y el corte por horario verificados contra el router
   real.
+- **Alias de dispositivos**: nombre propio por MAC en
+  `config/alias.json` (plantilla `alias.json.example`). Tiene prioridad
+  sobre hostname/fabricante en todo el toolkit (`resolve_device_name`):
+  Dispositivos, lista blanca, Monitoreo y los scripts CLI. Endpoints
+  `GET /api/alias` y `PUT /api/alias/{mac}` (no tocan el router, sin
+  `confirmar`); modal ✏️ en las páginas Dispositivos y Horario.
+  `build_device_map` e `inventario_dispositivos` exponen además el
+  nombre detectado y el alias por separado.
+- Lista blanca de la página Horario como tabla: columna de IP, tooltip
+  en "en red", buscador y contador de marcados; el panel usa más ancho
+  (`max-w-7xl`) y la lista blanca ocupa 3/5 en pantallas grandes.
 
 ### Corregido
 - **RouterOS v7**: `get_wan_interface` no detectaba la WAN (v7 ya no
   expone `gateway-status` en `/ip/route`; ahora se lee `immediate-gw`,
   `172.10.7.1%ether1`). Sin esto el CLI pedía la interfaz a mano y el
   panel respondía 400 al programar el corte.
+- `whitelist.json` guarda el nombre detectado, no el alias (quitar un
+  alias no deja su texto pegado en la lista blanca).
+- La API responde `ConfigError` (JSON de `config/` corrupto) como 500
+  con mensaje en español en vez de un error genérico.
 - `backend/generar_hash.py` vuelve a funcionar con el Python del sistema
   (sin venv): el hashing PBKDF2 se movió de `auth.py` a
   `backend/app/hashing.py` (solo stdlib) para no arrastrar el import de

@@ -8,4 +8,5 @@ from .mikrotik_api import (MikroTikAPI, load_config, fmt_speed, fmt_bytes,
                            run_script,
                            MikroTikConnectionError, MikroTikCommandError)
 from .app_config import (load_json_config, save_json_config,
-                         config_path, get_config_dir, ConfigError)
+                         config_path, get_config_dir, ConfigError,
+                         load_aliases, set_alias, ALIAS_MAX)

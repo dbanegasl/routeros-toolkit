@@ -271,7 +271,10 @@ def save_whitelist(macs: set, devices: dict, previous: dict):
     items = []
     for mac in sorted(macs):
         prev = previous.get(mac, {})
-        nombre = (devices.get(mac, {}).get("name")
+        # El nombre detectado, no el alias: el alias vive en alias.json y
+        # quitarlo no debe dejar su texto pegado aquí.
+        dev = devices.get(mac, {})
+        nombre = (dev.get("detected_name") or dev.get("name")
                   or prev.get("nombre", ""))
         items.append({
             "mac": mac,

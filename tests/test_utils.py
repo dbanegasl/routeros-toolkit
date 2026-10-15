@@ -15,6 +15,21 @@ from lib.mikrotik_api import (fmt_speed, fmt_bytes, is_random_mac,
                               resolve_device_name, load_config)
 
 
+# config/ aislado: un alias real en config/alias.json no debe alterar
+# los nombres que estos tests esperan.
+_CONFIG_TMP = tempfile.TemporaryDirectory()
+_ENV = mock.patch.dict(os.environ, {"MIKROTIK_CONFIG_DIR": _CONFIG_TMP.name})
+
+
+def setUpModule():
+    _ENV.start()
+
+
+def tearDownModule():
+    _ENV.stop()
+    _CONFIG_TMP.cleanup()
+
+
 # ---------------------------------------------------------------------------
 # Formateo de velocidades y bytes
 # ---------------------------------------------------------------------------

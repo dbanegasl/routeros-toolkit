@@ -7,6 +7,7 @@ import {
   useDispositivos,
 } from "../api/hooks";
 import { Confirmar } from "../components/Confirmar";
+import { EditarAlias, type DispositivoAlias } from "../components/EditarAlias";
 import { es } from "../i18n/es";
 
 const t = es.dispositivos;
@@ -39,6 +40,7 @@ export function Dispositivos() {
   const [busqueda, setBusqueda] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [accion, setAccion] = useState<AccionPendiente | null>(null);
+  const [editando, setEditando] = useState<DispositivoAlias | null>(null);
 
   const ipsBloqueadas = useMemo(
     () => new Set((bloqueos.data?.bloqueos ?? []).map((b) => b.ip)),
@@ -61,7 +63,7 @@ export function Dispositivos() {
     return lista.filter((d) => {
       if (filtro !== "todos" && d.tipo !== filtro) return false;
       if (!q) return true;
-      return [d.nombre, d.ip, d.mac].some((campo) =>
+      return [d.nombre, d.nombre_detectado, d.ip, d.mac].some((campo) =>
         campo.toLowerCase().includes(q),
       );
     });
@@ -135,7 +137,14 @@ export function Dispositivos() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-2.5 text-slate-200">{d.nombre}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="text-slate-200">{d.nombre}</div>
+                        {d.alias && (
+                          <div className="text-xs text-slate-500">
+                            {t.detectadoComo(d.nombre_detectado)}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
                         {d.mac || "—"}
                       </td>
@@ -146,7 +155,7 @@ export function Dispositivos() {
                       <td className="px-4 py-2.5 text-xs text-slate-500">
                         {d.tipo}
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td className="flex items-center gap-2 px-4 py-2.5">
                         <button
                           onClick={() =>
                             setAccion({
@@ -164,6 +173,21 @@ export function Dispositivos() {
                         >
                           {bloqueada ? t.desbloquear : `⚠️ ${t.bloquear}`}
                         </button>
+                        {d.mac && (
+                          <button
+                            onClick={() => setEditando({
+                              mac: d.mac.toUpperCase(),
+                              ip: d.ip,
+                              alias: d.alias,
+                              nombre_detectado: d.nombre_detectado,
+                            })}
+                            title={es.alias.editar}
+                            aria-label={es.alias.editar}
+                            className="rounded-md px-1.5 py-0.5 text-slate-500 hover:bg-slate-700 hover:text-slate-200"
+                          >
+                            ✏️
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -199,6 +223,8 @@ export function Dispositivos() {
             ? t.msjBloquear(accion.nombre, accion.ip)
             : t.msjDesbloquear(accion.nombre, accion.ip))}
       </Confirmar>
+
+      <EditarAlias dispositivo={editando} onCerrar={() => setEditando(null)} />
     </div>
   );
 }

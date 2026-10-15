@@ -18,6 +18,7 @@ Uso:
 
 import json
 import os
+import re
 from pathlib import Path
 
 
@@ -86,3 +87,46 @@ def save_json_config(name: str, data: dict):
             f.write("\n")
     except OSError as e:
         raise ConfigError(f"No se pudo escribir {path}: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Alias de dispositivos (config/alias.json) — nombre propio por MAC
+# ---------------------------------------------------------------------------
+
+ALIAS_CONFIG = "alias"
+ALIAS_MAX = 40
+_RE_MAC = re.compile(r"^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
+
+
+def load_aliases() -> dict:
+    """MAC (mayúsculas) → alias, desde config/alias.json ({} si no existe)."""
+    data = load_json_config(ALIAS_CONFIG, default={"alias": {}})
+    alias = data.get("alias")
+    if not isinstance(alias, dict):
+        raise ConfigError(
+            f"El archivo {config_path(ALIAS_CONFIG)} debe tener un objeto "
+            f"\"alias\" con pares MAC → nombre.")
+    return {str(mac).upper(): str(nombre).strip()
+            for mac, nombre in alias.items() if str(nombre).strip()}
+
+
+def set_alias(mac: str, alias: str) -> dict:
+    """Guarda (o quita, si alias queda vacío) el alias de una MAC.
+
+    Lanza ValueError con mensaje apto para el usuario si la MAC o el
+    alias no son válidos. Retorna el mapa de alias resultante.
+    """
+    mac = (mac or "").strip().upper()
+    if not _RE_MAC.match(mac):
+        raise ValueError(f"'{mac}' no es una MAC válida (AA:BB:CC:DD:EE:FF).")
+    alias = " ".join((alias or "").split())   # sin saltos ni espacios dobles
+    if len(alias) > ALIAS_MAX:
+        raise ValueError(f"El alias no puede superar {ALIAS_MAX} caracteres.")
+
+    aliases = load_aliases()
+    if alias:
+        aliases[mac] = alias
+    else:
+        aliases.pop(mac, None)
+    save_json_config(ALIAS_CONFIG, {"alias": dict(sorted(aliases.items()))})
+    return aliases

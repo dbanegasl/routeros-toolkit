@@ -86,6 +86,12 @@ class _EstadoMonitor:
     ifaces_prev_ts: float = 0.0
 
 
+def invalidar_nombres() -> None:
+    """Fuerza a releer los nombres en la próxima muestra (p.ej. tras
+    cambiar un alias) en vez de esperar los 60 s del cache."""
+    _EstadoMonitor.nombres_ts = 0.0
+
+
 def _muestra_monitor(api) -> dict:
     ahora = time.time()
     if ahora - _EstadoMonitor.nombres_ts > 60:
