@@ -15,11 +15,11 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from lib import MikroTikConnectionError, MikroTikCommandError
+from lib import ConfigError, MikroTikConnectionError, MikroTikCommandError
 from . import auth, ws
 from .deps import cerrar_api_compartida
-from .routers import (bloqueos, dispositivos, horario, monitoreo, qos,
-                      respaldos, sistema)
+from .routers import (alias, bloqueos, dispositivos, horario, monitoreo,
+                      qos, respaldos, sistema)
 
 
 @asynccontextmanager
@@ -32,7 +32,7 @@ async def _ciclo_de_vida(_app: FastAPI):
 app = FastAPI(
     lifespan=_ciclo_de_vida,
     title="RouterOS Toolkit — Panel web",
-    description="API del panel de administración del MikroTik hEX lite. "
+    description="API del panel de administración del router MikroTik. "
                 "Inicia sesión en /api/auth/login para usar los endpoints.",
     version="2.0.0",
     docs_url="/api/docs",
@@ -58,6 +58,7 @@ app.include_router(auth.router)
 app.include_router(sistema.salud_router)
 app.include_router(sistema.router)
 app.include_router(dispositivos.router)
+app.include_router(alias.router)
 app.include_router(monitoreo.router)
 app.include_router(horario.router)
 app.include_router(bloqueos.router)
@@ -91,4 +92,13 @@ def error_red(request: Request, exc: OSError):
         "detail": f"Error de red hablando con el router: {exc}",
         "sugerencia": "¿El equipo donde corre el panel alcanza la IP del "
                       "router? Prueba: ping al router desde ese equipo.",
+    })
+
+
+@app.exception_handler(ConfigError)
+def error_config(request: Request, exc: ConfigError):
+    return JSONResponse(status_code=500, content={
+        "detail": str(exc),
+        "sugerencia": "Revisa el archivo indicado en config/ (los .example "
+                      "muestran el formato esperado).",
     })

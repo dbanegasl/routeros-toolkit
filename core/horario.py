@@ -43,12 +43,16 @@ def _iface_de_ruta(ruta: dict) -> str:
     RouterOS v6 no siempre expone 'interface' en /ip/route/print: cuando
     el gateway es una IP, la interfaz real viene dentro de
     gateway-status ('172.10.7.1 reachable via  ether1').
+    RouterOS v7 ya no tiene gateway-status: la interfaz viene en
+    immediate-gw ('172.10.7.1%ether1', o solo 'pppoe-out1').
     """
     iface = ruta.get("interface", "")
     if iface:
         return iface
     m = re.search(r"via\s+(\S+)", ruta.get("gateway-status", ""))
-    return m.group(1) if m else ""
+    if m:
+        return m.group(1)
+    return ruta.get("immediate-gw", "").rpartition("%")[2]
 
 
 def get_wan_interface(api) -> str:
@@ -267,7 +271,10 @@ def save_whitelist(macs: set, devices: dict, previous: dict):
     items = []
     for mac in sorted(macs):
         prev = previous.get(mac, {})
-        nombre = (devices.get(mac, {}).get("name")
+        # El nombre detectado, no el alias: el alias vive en alias.json y
+        # quitarlo no debe dejar su texto pegado aquí.
+        dev = devices.get(mac, {})
+        nombre = (dev.get("detected_name") or dev.get("name")
                   or prev.get("nombre", ""))
         items.append({
             "mac": mac,

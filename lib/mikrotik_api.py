@@ -45,6 +45,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
+from .app_config import load_aliases
+
 # Prefijo LAN de respaldo cuando no se puede detectar desde el router.
 LAN_PREFIX = "192.168."
 
@@ -533,11 +535,13 @@ def lookup_mac_vendor_online(mac: str, cache: dict, timeout: int = 3) -> str:
 
 
 def resolve_device_name(ip: str, mac: str, hostname: str,
-                        is_static: bool = False) -> str:
+                        is_static: bool = False,
+                        aliases: Optional[dict] = None) -> str:
     """
     Construye el nombre más descriptivo posible para un dispositivo.
 
     Prioridad:
+      0. Alias definido por el usuario para la MAC (config/alias.json)
       1. Hostname DHCP (si existe y no es genérico como 'wlan0')
       2. Vendor del MAC + últimos 4 dígitos MAC (ej: "Amazon :3D:58")
       3. MAC completa como fallback
@@ -547,10 +551,18 @@ def resolve_device_name(ip: str, mac: str, hostname: str,
         mac       — Dirección MAC (AA:BB:CC:DD:EE:FF)
         hostname  — Nombre de host reportado por DHCP
         is_static — True si la IP fue asignada estáticamente
+        aliases   — mapa MAC→alias ya cargado (los bucles lo pasan para no
+                    releer el archivo por cada dispositivo); None = leerlo;
+                    {} = ignorar alias (nombre detectado)
 
     Returns:
         String con el nombre más descriptivo disponible.
     """
+    if aliases is None:
+        aliases = load_aliases()
+    if mac and mac.upper() in aliases:
+        return aliases[mac.upper()]
+
     vendor_cache = get_mac_vendor_cache()
     oui    = mac[:8].upper() if mac else ""
     vendor = vendor_cache.get(oui, "")
@@ -637,10 +649,12 @@ def build_device_map(api, by: str = "ip") -> dict:
               (MAC en mayúsculas; descarta entradas sin MAC)
 
     Returns:
-        dict clave → {"ip", "mac", "hostname", "name", "static"}
+        dict clave → {"ip", "mac", "hostname", "name", "detected_name",
+                      "alias", "static"} — name ya trae el alias si existe
     """
     devices: dict = {}
     lan = get_lan_prefix(api)
+    aliases = load_aliases()
 
     for l in api.command("/ip/dhcp-server/lease/print"):
         ip = l.get("address", "")
@@ -648,7 +662,9 @@ def build_device_map(api, by: str = "ip") -> dict:
         hostname = l.get("host-name", "")
         devices[ip] = {
             "ip": ip, "mac": mac, "hostname": hostname,
-            "name": resolve_device_name(ip, mac, hostname, False),
+            "name": resolve_device_name(ip, mac, hostname, False, aliases),
+            "detected_name": resolve_device_name(ip, mac, hostname, False, {}),
+            "alias": aliases.get(mac.upper(), ""),
             "static": False,
         }
 
@@ -658,7 +674,9 @@ def build_device_map(api, by: str = "ip") -> dict:
         if ip.startswith(lan) and ip not in devices:
             devices[ip] = {
                 "ip": ip, "mac": mac, "hostname": "",
-                "name": resolve_device_name(ip, mac, "", True),
+                "name": resolve_device_name(ip, mac, "", True, aliases),
+                "detected_name": resolve_device_name(ip, mac, "", True, {}),
+                "alias": aliases.get(mac.upper(), ""),
                 "static": True,
             }
 

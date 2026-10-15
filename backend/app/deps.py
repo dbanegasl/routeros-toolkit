@@ -3,7 +3,7 @@ deps.py — Dependencias compartidas del backend
 ==============================================
 
 - Conexión al router: UNA conexión persistente compartida, bajo candado
-  global. El hEX lite es modesto y además anota cada login/logout en su
+  global. El router es modesto y además anota cada login/logout en su
   log ("user admin logged in via api"): abrir una conexión por petición
   inundaba el syslog. La conexión se reutiliza entre peticiones y se
   reabre sola si el router la corta.

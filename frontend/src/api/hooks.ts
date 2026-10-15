@@ -186,6 +186,25 @@ export const useGuardarWhitelist = escritura(
   ["horario", "whitelist"],
 );
 
+/** Alias de un dispositivo — vive en config/alias.json, no toca el
+ *  router (sin confirmar). Vacío = quitarlo. Invalida toda vista con
+ *  nombres de dispositivos. */
+export function useGuardarAlias() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { mac: string; alias: string }) =>
+      apiPut<{ mensaje: string; mac: string; alias: string }>(
+        `/api/alias/${encodeURIComponent(body.mac)}`,
+        { alias: body.alias },
+      ),
+    onSuccess: () => {
+      for (const key of ["dispositivos", "whitelist", "horario", "consumo"]) {
+        void qc.invalidateQueries({ queryKey: [key] });
+      }
+    },
+  });
+}
+
 export const useDesplegarQos = escritura(
   (_body: Record<string, never>) =>
     apiPost<{ mensaje: string }>("/api/qos/desplegar", { confirmar: true }),

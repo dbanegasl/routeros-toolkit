@@ -20,7 +20,9 @@ export interface Sistema {
 export interface Dispositivo {
   ip: string;
   mac: string;
-  nombre: string;
+  nombre: string;            // alias si existe; si no, el detectado
+  nombre_detectado: string;  // hostname / fabricante / MAC
+  alias: string;             // "" = sin alias
   estado: string;
   puerto: string;
   tipo: "DHCP" | "STATIC";
@@ -34,6 +36,8 @@ export interface DispositivosResp {
 export interface WhitelistItem {
   mac: string;
   nombre: string;
+  nombre_detectado: string;
+  alias: string;
   ip: string | null;
   en_red: boolean;
   aplicada_en_router: boolean;
@@ -124,6 +128,8 @@ export interface BloqueosResp {
 export interface WhitelistDispositivo {
   mac: string;
   nombre: string;
+  nombre_detectado: string;
+  alias: string;
   ip: string | null;
   en_red: boolean;
   aplicada_en_router: boolean;

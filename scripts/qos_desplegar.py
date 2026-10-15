@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Implementar Plan QoS MikroTik — hEX lite — RouterOS v6.49.19
+Implementar Plan QoS MikroTik — RouterOS v6/v7
 =============================================================
 
 Despliega automáticamente todas las reglas de Mangle y Queue Tree del plan
@@ -281,7 +281,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Desplegar Plan QoS MikroTik — hEX lite — RouterOS v6.49.19"
+        description="Desplegar Plan QoS MikroTik — RouterOS v6/v7"
     )
     parser.add_argument(
         '--rollback',

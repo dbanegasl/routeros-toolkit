@@ -14,6 +14,7 @@ import {
   useWhitelist,
 } from "../api/hooks";
 import { Confirmar } from "../components/Confirmar";
+import { EditarAlias } from "../components/EditarAlias";
 import { es } from "../i18n/es";
 
 const t = es.horario;
@@ -178,6 +179,8 @@ function Editor() {
 interface FilaWhitelist {
   mac: string;
   nombre: string;
+  nombre_detectado: string;
+  alias: string;
   ip: string | null;
   en_red: boolean;
 }
@@ -188,6 +191,8 @@ function ListaBlanca() {
   const guardar = useGuardarWhitelist();
   const [marcadas, setMarcadas] = useState<Set<string> | null>(null);
   const [confirmando, setConfirmando] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [editando, setEditando] = useState<FilaWhitelist | null>(null);
 
   // Filas: todos los dispositivos de la red ∪ whitelist (los offline
   // también, para poder quitarlos), como el --allow del CLI.
@@ -198,6 +203,8 @@ function ListaBlanca() {
       porMac.set(d.mac.toUpperCase(), {
         mac: d.mac.toUpperCase(),
         nombre: d.nombre,
+        nombre_detectado: d.nombre_detectado,
+        alias: d.alias,
         ip: d.ip,
         en_red: true,
       });
@@ -207,6 +214,8 @@ function ListaBlanca() {
         porMac.set(w.mac, {
           mac: w.mac,
           nombre: w.nombre,
+          nombre_detectado: w.nombre_detectado,
+          alias: w.alias,
           ip: w.ip,
           en_red: w.en_red,
         });
@@ -216,6 +225,16 @@ function ListaBlanca() {
       (a.ip ?? "z").localeCompare(b.ip ?? "z", "es", { numeric: true }),
     );
   }, [red.data, whitelist.data]);
+
+  const visibles = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return filas;
+    return filas.filter((d) =>
+      [d.nombre, d.nombre_detectado, d.ip ?? "", d.mac].some((campo) =>
+        campo.toLowerCase().includes(q),
+      ),
+    );
+  }, [filas, busqueda]);
 
   const originales = useMemo(
     () => new Set((whitelist.data?.dispositivos ?? []).map((d) => d.mac)),
@@ -238,38 +257,107 @@ function ListaBlanca() {
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-      <div className="mb-1 text-sm font-medium text-slate-400">
-        🛡️ {t.whitelist}
+      <div className="mb-1 flex items-baseline justify-between gap-3">
+        <span className="text-sm font-medium text-slate-400">
+          🛡️ {t.whitelist}
+        </span>
+        <span className="text-xs text-slate-500">
+          {t.marcados(seleccion.size, filas.length)}
+        </span>
       </div>
       <p className="mb-3 text-xs text-slate-500">{t.whitelistAyuda}</p>
 
-      <div className="mb-4 max-h-80 space-y-1 overflow-y-auto">
-        {filas.map((d) => (
-          <label
-            key={d.mac}
-            className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-800/60"
-          >
-            <input
-              type="checkbox"
-              checked={seleccion.has(d.mac)}
-              onChange={() => toggle(d.mac)}
-              className="accent-emerald-500"
-            />
-            <span className="flex-1 truncate text-slate-200">
-              {d.nombre || d.mac}
-            </span>
-            <span className="font-mono text-xs text-slate-600">{d.mac}</span>
-            <span
-              className={
-                d.en_red
-                  ? "text-xs text-emerald-400"
-                  : "text-xs text-slate-600"
-              }
-            >
-              {d.en_red ? `● ${t.enRed}` : t.offline}
-            </span>
-          </label>
-        ))}
+      <input
+        type="search"
+        value={busqueda}
+        onChange={(e) => setBusqueda(e.target.value)}
+        placeholder={t.buscar}
+        className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus:border-sky-500"
+      />
+
+      <div className="mb-4 max-h-[32rem] overflow-auto rounded-lg border border-slate-800">
+        <table className="w-full min-w-[560px] text-left text-sm">
+          <thead className="sticky top-0 z-10 bg-slate-900 text-xs uppercase text-slate-500">
+            <tr>
+              <th className="w-8 px-2 py-2" />
+              <th className="px-2 py-2">{t.colNombre}</th>
+              <th className="px-2 py-2">{t.colIp}</th>
+              <th className="px-2 py-2">{t.colMac}</th>
+              <th className="px-2 py-2">{t.colEstado}</th>
+              <th className="w-8 px-2 py-2" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800/70">
+            {visibles.map((d) => (
+              <tr
+                key={d.mac}
+                onClick={() => toggle(d.mac)}
+                className="cursor-pointer hover:bg-slate-800/60"
+              >
+                <td className="px-2 py-1.5">
+                  <input
+                    type="checkbox"
+                    checked={seleccion.has(d.mac)}
+                    onChange={() => toggle(d.mac)}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={d.nombre || d.mac}
+                    className="accent-emerald-500"
+                  />
+                </td>
+                <td className="max-w-[16rem] px-2 py-1.5">
+                  <div className="truncate text-slate-200" title={d.nombre}>
+                    {d.nombre || d.mac}
+                  </div>
+                  {d.alias && d.nombre_detectado && (
+                    <div className="truncate text-xs text-slate-500"
+                      title={d.nombre_detectado}>
+                      {d.nombre_detectado}
+                    </div>
+                  )}
+                </td>
+                <td className="whitespace-nowrap px-2 py-1.5 font-mono text-xs text-cyan-300">
+                  {d.ip ?? <span className="text-slate-600">—</span>}
+                </td>
+                <td className="whitespace-nowrap px-2 py-1.5 font-mono text-xs text-slate-500">
+                  {d.mac}
+                </td>
+                <td className="whitespace-nowrap px-2 py-1.5">
+                  <span
+                    title={d.en_red && d.ip
+                      ? t.enRedTooltip(d.ip) : t.offlineTooltip}
+                    className={
+                      d.en_red
+                        ? "text-xs text-emerald-400"
+                        : "text-xs text-slate-600"
+                    }
+                  >
+                    {d.en_red ? `● ${t.enRed}` : t.offline}
+                  </span>
+                </td>
+                <td className="px-2 py-1.5">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditando(d);
+                    }}
+                    title={es.alias.editar}
+                    aria-label={es.alias.editar}
+                    className="rounded-md px-1.5 py-0.5 text-slate-500 hover:bg-slate-700 hover:text-slate-200"
+                  >
+                    ✏️
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {visibles.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-2 py-6 text-center text-slate-500">
+                  {es.dispositivos.vacio}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       {guardar.isError && (
@@ -307,6 +395,8 @@ function ListaBlanca() {
       >
         {t.msjWhitelist(seleccion.size)}
       </Confirmar>
+
+      <EditarAlias dispositivo={editando} onCerrar={() => setEditando(null)} />
     </div>
   );
 }
@@ -345,13 +435,15 @@ export function Horario() {
   return (
     <div>
       <h1 className="mb-4 text-xl font-semibold text-slate-100">{t.titulo}</h1>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-4">
+      <div className="grid items-start gap-4 xl:grid-cols-5">
+        <div className="space-y-4 xl:col-span-2">
           <EstadoCorte />
           <Editor />
           <Eliminar />
         </div>
-        <ListaBlanca />
+        <div className="xl:col-span-3">
+          <ListaBlanca />
+        </div>
       </div>
     </div>
   );

@@ -65,7 +65,7 @@ export function Layout({ children }: { children: ReactNode }) {
       </header>
 
       <main className="px-4 py-6 pb-24 md:ml-52 md:pb-6 lg:px-8">
-        <div className="mx-auto max-w-5xl">{children}</div>
+        <div className="mx-auto max-w-7xl">{children}</div>
       </main>
 
       {/* Barra inferior móvil */}

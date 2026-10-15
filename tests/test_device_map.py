@@ -6,9 +6,27 @@ Usa una API falsa que responde con leases DHCP y entradas ARP
 predefinidas. No requiere router.
 """
 
+import os
+import tempfile
 import unittest
+from unittest import mock
 
 from lib.mikrotik_api import build_device_map, build_name_map
+
+
+# config/ aislado: un alias real en config/alias.json no debe alterar
+# los nombres que estos tests esperan.
+_CONFIG_TMP = tempfile.TemporaryDirectory()
+_ENV = mock.patch.dict(os.environ, {"MIKROTIK_CONFIG_DIR": _CONFIG_TMP.name})
+
+
+def setUpModule():
+    _ENV.start()
+
+
+def tearDownModule():
+    _ENV.stop()
+    _CONFIG_TMP.cleanup()
 
 
 class FakeAPI:
