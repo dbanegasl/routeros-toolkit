@@ -120,9 +120,12 @@ class TestHorarioEscrituras:
         # 1º: se eliminan las reglas propias previas (*1 DROP, *2 ACCEPT)
         assert writes[0] == ("/ip/firewall/filter/remove", ["=.id=*1"])
         assert writes[1] == ("/ip/firewall/filter/remove", ["=.id=*2"])
-        # 2º: ACCEPT de la whitelist conservada, 3º: DROP con el horario
+        # 2º: ACCEPT de la whitelist conservada, 3º: registro de intentos,
+        # 4º: DROP con el horario
         assert "=comment=HORARIO-PERMITIDO-AA:BB:CC:11:22:33" in writes[2][1]
-        drop_params = writes[3][1]
+        assert "=comment=HORARIO-INTENTOS" in writes[3][1]
+        assert "=time=22:00:00-06:30:00,fri,sat" in writes[3][1]
+        drop_params = writes[4][1]
         assert "=action=drop" in drop_params
         assert "=time=22:00:00-06:30:00,fri,sat" in drop_params
 
@@ -244,3 +247,31 @@ class TestCicloCompleto:
         # Y el orden correcto: ACCEPT antes que DROP
         assert (comentarios.index("HORARIO-PERMITIDO-F0:2F:74:CB:97:3F")
                 < comentarios.index("HORARIO-INTERNET"))
+
+
+# ---------------------------------------------------------------------------
+# Afectados por el corte (lectura)
+# ---------------------------------------------------------------------------
+
+def test_afectados(session):
+    fake = session.fake_api
+    fake.responses["/ip/firewall/address-list/print"] = [
+        {"list": "HORARIO-INTENTOS", "address": "192.168.5.22",
+         "timeout": "9m30s"}]
+    r = session.get("/api/horario/afectados")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["hay_corte"] is True
+    assert data["registra_intentos"] is False      # la FakeAPI no tiene la regla
+    # kevin-pc (bound, fuera de la whitelist AA:BB…) intentó hace 30 s
+    filas = {d["ip"]: d for d in data["dispositivos"]}
+    assert filas["192.168.5.22"]["intento_hace_s"] == 30
+    assert filas["192.168.5.22"]["nombre"] == "kevin-pc"
+    assert data["intentando"] == 1
+    assert fake.writes == []                        # solo lectura
+
+
+def test_afectados_sin_corte(session):
+    session.fake_api.responses["/ip/firewall/filter/print"] = []
+    data = session.get("/api/horario/afectados").json()
+    assert data["hay_corte"] is False and data["en_curso"] is False

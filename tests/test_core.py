@@ -14,7 +14,8 @@ from core.bloqueos import (COMMENT_TAG, reglas_bloqueo, buscar_bloqueo,
                            bloquear_ip, desbloquear_ip)
 from core.dispositivos import (guess_device_type, fmt_lease_time,
                                filtrar_dispositivos)
-from core.horario import apply_all_rules, remove_all_rules, DROP_TAG, ALLOW_TAG
+from core.horario import (apply_all_rules, remove_all_rules, DROP_TAG,
+                          ALLOW_TAG, TRY_TAG, TRY_LIST)
 from core.monitoreo import (snapshot_consumo, ordenar_consumo,
                             calcular_delta, interfaz_mas_activa,
                             resumen_sistema, nivel_log)
@@ -251,20 +252,27 @@ class TestBloqueos(unittest.TestCase):
 
 class TestHorarioReglas(unittest.TestCase):
 
-    def test_apply_all_rules_orden_accept_luego_drop(self):
+    def test_apply_all_rules_orden_accept_intentos_drop(self):
         api = FakeAPI({})
         apply_all_rules(api, "ether1", "01:00:00", "06:00:00",
                         ["mon", "tue"], ["AA:BB:CC:11:22:33"])
-        self.assertEqual(len(api.writes), 2)
+        self.assertEqual(len(api.writes), 3)
         # Primero la ACCEPT de la lista blanca…
         cmd0, params0 = api.writes[0]
         self.assertIn("=action=accept", params0)
         self.assertIn(f"=comment={ALLOW_TAG}-AA:BB:CC:11:22:33", params0)
-        # …después la DROP global con horario
+        # …luego el registro de intentos (mismo horario, no corta)…
         cmd1, params1 = api.writes[1]
-        self.assertIn("=action=drop", params1)
+        self.assertIn("=action=add-src-to-address-list", params1)
+        self.assertIn(f"=address-list={TRY_LIST}", params1)
         self.assertIn("=time=01:00:00-06:00:00,mon,tue", params1)
-        self.assertIn(f"=comment={DROP_TAG}", params1)
+        self.assertIn("=out-interface=ether1", params1)
+        self.assertIn(f"=comment={TRY_TAG}", params1)
+        # …y al final la DROP global con horario
+        cmd2, params2 = api.writes[2]
+        self.assertIn("=action=drop", params2)
+        self.assertIn("=time=01:00:00-06:00:00,mon,tue", params2)
+        self.assertIn(f"=comment={DROP_TAG}", params2)
 
     def test_remove_all_rules_solo_propias(self):
         api = FakeAPI({"/ip/firewall/filter/print": [
@@ -272,11 +280,18 @@ class TestHorarioReglas(unittest.TestCase):
             {".id": "*2", "comment": f"{ALLOW_TAG}-AA:BB:CC:11:22:33"},
             {".id": "*3", "comment": "BLOQUEADO-POR-MENU-192.168.5.30"},
             {".id": "*4", "comment": ""},
+            {".id": "*5", "comment": TRY_TAG},
+        ], "/ip/firewall/address-list/print": [
+            {".id": "*A1", "list": TRY_LIST, "address": "192.168.5.48"},
         ]})
         n = remove_all_rules(api)
-        self.assertEqual(n, 2)
-        removidas = [p[0] for _, p in api.writes]
-        self.assertEqual(removidas, ["=.id=*1", "=.id=*2"])
+        self.assertEqual(n, 3)
+        self.assertEqual(api.writes, [
+            ("/ip/firewall/filter/remove", ["=.id=*1"]),
+            ("/ip/firewall/filter/remove", ["=.id=*2"]),
+            ("/ip/firewall/filter/remove", ["=.id=*5"]),
+            ("/ip/firewall/address-list/remove", ["=.id=*A1"]),
+        ])
 
 
 # ---------------------------------------------------------------------------

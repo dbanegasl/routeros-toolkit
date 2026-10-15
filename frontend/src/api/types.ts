@@ -139,6 +139,24 @@ export interface WhitelistResp {
   dispositivos: WhitelistDispositivo[];
 }
 
+export interface Afectado {
+  ip: string;
+  mac: string;
+  nombre: string;
+  nombre_detectado: string;
+  alias: string;
+  intento_hace_s: number | null;   // null = no intentó salir (últimos 10 min)
+}
+
+export interface AfectadosResp {
+  hay_corte: boolean;
+  en_curso: boolean;
+  registra_intentos: boolean;
+  total: number;
+  intentando: number;
+  dispositivos: Afectado[];
+}
+
 // ── QoS ──────────────────────────────────────────────────────────────
 
 export interface QosEstado {

@@ -3,20 +3,27 @@ core/horario.py — Corte de internet por horario con lista blanca
 ================================================================
 
 Lógica extraída de horario_internet.py: detección de WAN, lectura y
-creación de reglas etiquetadas (HORARIO-INTERNET / HORARIO-PERMITIDO),
-parsing de horarios de RouterOS v6 y lista blanca persistente en
-config/whitelist.json. Solo gestiona reglas propias.
+creación de reglas etiquetadas (HORARIO-INTERNET / HORARIO-PERMITIDO /
+HORARIO-INTENTOS), parsing de horarios de RouterOS v6/v7, lista blanca
+persistente en config/whitelist.json y los dispositivos afectados por el
+corte. Solo gestiona reglas propias.
 """
 
 import re
 from datetime import date
 
 from lib import (load_json_config, save_json_config, get_router_datetime,
-                 parse_router_date)
+                 parse_router_date, get_lan_prefix, build_device_map)
 
 # Tags para identificar nuestras reglas
 DROP_TAG  = "HORARIO-INTERNET"       # la regla DROP global
 ALLOW_TAG = "HORARIO-PERMITIDO"      # reglas ACCEPT por MAC (lista blanca)
+TRY_TAG   = "HORARIO-INTENTOS"       # anota quién intenta salir (justo antes del DROP)
+
+# Address-list donde la regla TRY_TAG anota la IP de cada dispositivo que
+# intenta salir durante el corte; la entrada caduca sola.
+TRY_LIST = "HORARIO-INTENTOS"
+TRY_TIMEOUT_S = 600                  # 10 min
 
 # Archivo de persistencia: la lista blanca sobrevive a --remove,
 # así no hay que rearmarla a mano al reprogramar un corte.
@@ -183,26 +190,34 @@ def get_router_now(api) -> tuple[int, str, str] | None:
 # ---------------------------------------------------------------------------
 
 def remove_all_rules(api) -> int:
-    """Elimina todas las reglas (DROP + ACCEPT) de este gestor.
+    """Elimina todas las reglas (DROP + ACCEPT + INTENTOS) de este gestor
+    y las entradas de su address-list. Retorna cuántas reglas quitó.
 
     NO borra config/whitelist.json: la lista blanca persiste y se
     reaplica automáticamente al programar un nuevo corte.
     """
     to_remove = [
         r[".id"] for r in api.command("/ip/firewall/filter/print")
-        if r.get("comment", "") == DROP_TAG
+        if r.get("comment", "") in (DROP_TAG, TRY_TAG)
         or r.get("comment", "").startswith(ALLOW_TAG)
     ]
     for rid in to_remove:
         api.command("/ip/firewall/filter/remove", params=[f"=.id={rid}"])
+    for e in api.command("/ip/firewall/address-list/print",
+                         queries=[f"?list={TRY_LIST}"]):
+        api.command("/ip/firewall/address-list/remove",
+                    params=[f"=.id={e['.id']}"])
     return len(to_remove)
 
 
 def apply_all_rules(api, wan: str, start: str, end: str,
                     days: list, allowed_macs: list):
     """
-    Crea primero las ACCEPT (lista blanca) y luego la DROP global.
-    El orden es crítico: RouterOS procesa top-down, primera coincidencia gana.
+    Crea primero las ACCEPT (lista blanca), luego la de INTENTOS y al
+    final la DROP global. El orden es crítico: RouterOS procesa top-down,
+    primera coincidencia gana — la de INTENTOS no corta (anota la IP en
+    TRY_LIST y deja seguir el paquete hasta el DROP), así que solo ve a
+    los que no están en la lista blanca y durante el mismo horario.
     """
     days_str = ",".join(days)
     time_val = f"{start}-{end},{days_str}"
@@ -217,7 +232,18 @@ def apply_all_rules(api, wan: str, start: str, end: str,
             f"=comment={ALLOW_TAG}-{mac.upper()}",
         ])
 
-    # 2. DROP global con horario (para todos los demás)
+    # 2. Registro de intentos (mismo horario, no corta)
+    api.command("/ip/firewall/filter/add", params=[
+        "=chain=forward",
+        f"=out-interface={wan}",
+        "=action=add-src-to-address-list",
+        f"=address-list={TRY_LIST}",
+        f"=address-list-timeout={TRY_TIMEOUT_S}s",
+        f"=time={time_val}",
+        f"=comment={TRY_TAG}",
+    ])
+
+    # 3. DROP global con horario (para todos los demás)
     api.command("/ip/firewall/filter/add", params=[
         "=chain=forward",
         f"=out-interface={wan}",
@@ -246,6 +272,100 @@ def aplicar_solo_whitelist(api, wan: str, macs) -> None:
         if wan:
             params.insert(1, f"=out-interface={wan}")
         api.command("/ip/firewall/filter/add", params=params)
+
+
+# ---------------------------------------------------------------------------
+# Afectados por el corte: en la red, fuera de la lista blanca
+# ---------------------------------------------------------------------------
+
+# Estados ARP que indican que el equipo respondió hace poco
+_ARP_VIVO = {"reachable", "stale", "delay", "probe", "permanent"}
+_UNIDADES_S = {"w": 604800, "d": 86400, "h": 3600, "m": 60, "s": 1}
+
+
+def duracion_a_segundos(valor: str) -> int | None:
+    """Duración de RouterOS → segundos: '9m41s', '1h2m', '41s870ms'
+    (v7 puede añadir milisegundos, se ignoran) o '00:09:41'.
+    None si no se reconoce."""
+    valor = (valor or "").strip()
+    if not valor:
+        return None
+    if ":" in valor:
+        try:
+            partes = [int(x) for x in valor.split(":")]
+        except ValueError:
+            return None
+        while len(partes) < 3:
+            partes.insert(0, 0)
+        h, m, s = partes[-3:]
+        return h * 3600 + m * 60 + s
+    tokens = re.findall(r"(\d+)(ms|us|ns|[wdhms])", valor)
+    if not tokens or "".join(n + u for n, u in tokens) != valor:
+        return None
+    return sum(int(n) * _UNIDADES_S.get(u, 0) for n, u in tokens)
+
+
+def get_try_rule(api) -> dict | None:
+    """Regla de registro de intentos, o None (cortes creados antes de
+    que existiera no la tienen hasta reprogramarlos)."""
+    for r in api.command("/ip/firewall/filter/print"):
+        if r.get("comment", "") == TRY_TAG:
+            return r
+    return None
+
+
+def intentos_recientes(api) -> dict:
+    """IP → segundos desde su último intento de salir (address-list)."""
+    hace = {}
+    for e in api.command("/ip/firewall/address-list/print",
+                         queries=[f"?list={TRY_LIST}"]):
+        restante = duracion_a_segundos(e.get("timeout", ""))
+        if e.get("address") and restante is not None:
+            hace[e["address"]] = max(0, TRY_TIMEOUT_S - restante)
+    return hace
+
+
+def dispositivos_afectados(api, whitelist_macs) -> list:
+    """Dispositivos conectados ahora que NO están en la lista blanca.
+
+    Durante el corte son los que tienen red pero no internet. "Conectado"
+    = lease DHCP bound o entrada ARP viva. Cada uno lleva
+    intento_hace_s (segundos desde su último intento de salir, o None si
+    no intentó en los últimos 10 min / no hay regla de registro).
+    Orden: los que intentan salir primero (más reciente arriba), luego
+    por IP.
+    """
+    lan = get_lan_prefix(api)
+    wl = {m.upper() for m in whitelist_macs}
+    devices = build_device_map(api, by="ip")
+    bound = {l.get("address") for l in api.command("/ip/dhcp-server/lease/print")
+             if l.get("status") == "bound"}
+    arp_vivo = {a.get("address") for a in api.command("/ip/arp/print")
+                if a.get("status", "") in _ARP_VIVO
+                and a.get("address", "").startswith(lan)}
+    intentos = intentos_recientes(api)
+
+    afectados = []
+    for ip, d in devices.items():
+        if not d["mac"] or d["mac"].upper() in wl:
+            continue
+        if ip not in bound and ip not in arp_vivo:
+            continue
+        afectados.append({
+            "ip": ip,
+            "mac": d["mac"].upper(),
+            "nombre": d["name"],
+            "nombre_detectado": d["detected_name"],
+            "alias": d["alias"],
+            "intento_hace_s": intentos.get(ip),
+        })
+
+    def orden(a):
+        ip_num = [int(x) for x in a["ip"].split(".") if x.isdigit()]
+        hace = a["intento_hace_s"]
+        return (hace is None, hace if hace is not None else 0, ip_num)
+
+    return sorted(afectados, key=orden)
 
 
 # ---------------------------------------------------------------------------
